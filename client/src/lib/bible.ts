@@ -167,7 +167,9 @@ export async function fetchChapter(bookId: string, chapter: number): Promise<Cha
     if (item.type === 'verse') {
       const text = (item.content || [])
         .map((c: any) => typeof c === 'string' ? c : c.text || '')
-        .join('');
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
       verses.push({ number: item.number, text });
     }
   }

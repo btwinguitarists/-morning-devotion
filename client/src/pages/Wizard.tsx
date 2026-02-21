@@ -277,6 +277,9 @@ function ReadingStep({ sessionId, planDay, biblePlan }: { sessionId: number, pla
     const item = items.find(i => i.reference === activeChapter?.label);
     if (item) {
       toggleItem(item.id!, true);
+      if (activeChapterIndex < chapters.length - 1) {
+        setTimeout(() => setActiveChapterIndex(i => i + 1), 300);
+      }
     }
   };
 

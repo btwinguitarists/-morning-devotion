@@ -10,6 +10,61 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
+function findBestMatch(verseText: string, highlightText: string): { start: number; length: number } | null {
+  const vLower = verseText.toLowerCase();
+  const hLower = highlightText.toLowerCase();
+  const idx = vLower.indexOf(hLower);
+  if (idx !== -1) return { start: idx, length: highlightText.length };
+  const words = highlightText.split(/\s+/);
+  for (let len = words.length; len >= 2; len--) {
+    for (let start = 0; start + len <= words.length; start++) {
+      const sub = words.slice(start, start + len).join(' ');
+      const subIdx = vLower.indexOf(sub.toLowerCase());
+      if (subIdx !== -1) return { start: subIdx, length: sub.length };
+    }
+  }
+  return null;
+}
+
+function renderHighlightedText(text: string, highlightTexts: string[]) {
+  type Segment = { text: string; highlighted: boolean };
+  let segments: Segment[] = [{ text, highlighted: false }];
+
+  for (const ht of highlightTexts) {
+    const match = findBestMatch(text, ht);
+    if (!match) continue;
+    const next: Segment[] = [];
+    for (const seg of segments) {
+      if (seg.highlighted) {
+        next.push(seg);
+        continue;
+      }
+      const segStart = text.indexOf(seg.text);
+      const segEnd = segStart + seg.text.length;
+      const mStart = match.start;
+      const mEnd = match.start + match.length;
+      if (mEnd <= segStart || mStart >= segEnd) {
+        next.push(seg);
+        continue;
+      }
+      const relStart = Math.max(0, mStart - segStart);
+      const relEnd = Math.min(seg.text.length, mEnd - segStart);
+      if (relStart > 0) next.push({ text: seg.text.slice(0, relStart), highlighted: false });
+      next.push({ text: seg.text.slice(relStart, relEnd), highlighted: true });
+      if (relEnd < seg.text.length) next.push({ text: seg.text.slice(relEnd), highlighted: false });
+    }
+    segments = next;
+  }
+
+  return segments.map((seg, i) =>
+    seg.highlighted ? (
+      <mark key={i} className="bg-amber-100/70 dark:bg-amber-900/40 rounded-sm px-0.5">{seg.text}</mark>
+    ) : (
+      <span key={i}>{seg.text}</span>
+    )
+  );
+}
+
 interface ChapterReaderProps {
   bookId: string;
   bookName: string;
@@ -67,10 +122,11 @@ export function ChapterReader({
     (h: any) => h.bookId === bookId && h.chapter === chapter
   );
 
-  const highlightedVerses = new Set<number>();
+  const highlightsByVerse = new Map<number, string[]>();
   for (const h of filteredHighlights) {
     for (let v = h.verseStart; v <= h.verseEnd; v++) {
-      highlightedVerses.add(v);
+      if (!highlightsByVerse.has(v)) highlightsByVerse.set(v, []);
+      highlightsByVerse.get(v)!.push(h.highlightText);
     }
   }
 
@@ -222,21 +278,16 @@ export function ChapterReader({
 
         <p className="font-serif text-lg leading-relaxed text-foreground">
           {chapterData.verses.map((v) => {
-            const isHighlighted = highlightedVerses.has(v.number);
+            const verseHighlights = highlightsByVerse.get(v.number);
             return (
               <span
                 key={v.number}
                 data-verse={v.number}
-                className={
-                  isHighlighted
-                    ? "bg-amber-100/60 dark:bg-amber-900/30 rounded-sm"
-                    : ""
-                }
               >
                 <sup className="text-xs text-muted-foreground/50 mr-0.5 select-none">
                   {v.number}
                 </sup>
-                {v.text}{" "}
+                {verseHighlights ? renderHighlightedText(v.text, verseHighlights) : v.text}{" "}
               </span>
             );
           })}

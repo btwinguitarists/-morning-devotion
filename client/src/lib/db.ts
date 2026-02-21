@@ -58,7 +58,7 @@ export class EremosDB extends Dexie {
 
   constructor() {
     super('EremosDB');
-    this.version(1).stores({
+    this.version(2).stores({
       biblePlan: '++id, day',
       examinationQuestions: '++id, category',
       sessions: '++id, date, status',

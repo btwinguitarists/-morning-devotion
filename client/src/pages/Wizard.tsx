@@ -135,15 +135,16 @@ function StepContent({ stepId, sessionId, planDay }: { stepId: string, sessionId
     case 'examination-1':
     case 'examination-2':
     case 'examination-3':
-      // Simplified for demo: rotating generic examination prompts if CSV fails
-      // In production, fetch specific questions based on day/category
-      const examPrompts = [
-        "What thoughts have I been entertaining?",
-        "Where have I sought to be noticed?",
-        "Has my heart been attentive to God?"
-      ];
-      const index = parseInt(stepId.split('-')[1]) - 1;
-      return <PromptStep sessionId={sessionId} stepId={stepId} question={examPrompts[index]} label="Examination" />;
+      const examIndex = parseInt(stepId.split('-')[1]) - 1;
+      const question = prompts.examination[examIndex]?.question || "Reflect on this moment.";
+      return (
+        <PromptStep 
+          sessionId={sessionId} 
+          stepId={stepId} 
+          question={question} 
+          label={`Examination: ${prompts.category}`} 
+        />
+      );
 
     case 'mood':
       return <MoodStep sessionId={sessionId} />;

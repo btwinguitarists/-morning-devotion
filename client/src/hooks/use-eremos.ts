@@ -30,29 +30,46 @@ export function useEremosData() {
           const res = await fetch('/data/bible_plan.csv');
           if (res.ok) {
             const text = await res.text();
-            const plan = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
-            await db.biblePlan.bulkAdd(plan as any);
-          } else {
-            // Fallback if fetch fails
-            const plan = Papa.parse(SAMPLE_PLAN, { header: true, skipEmptyLines: true }).data;
+            // Using a more robust parser configuration for Bible plan
+            const plan = Papa.parse(text, { 
+              header: true, 
+              skipEmptyLines: true,
+              transformHeader: (h) => h.trim() 
+            }).data.map((row: any) => ({
+              day: parseInt(row.Day),
+              references: [
+                row['Torah / History'],
+                row['Wisdom'],
+                row['Prophets'],
+                row['New Testament']
+              ].filter(Boolean).join('; ')
+            }));
             await db.biblePlan.bulkAdd(plan as any);
           }
           
           const examRes = await fetch('/data/desert_examination_framework.csv');
           if (examRes.ok) {
             const text = await examRes.text();
-            const exam = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
-            await db.examinationQuestions.bulkAdd(exam as any);
-          } else {
-            const exam = Papa.parse(SAMPLE_EXAM, { header: true, skipEmptyLines: true }).data;
-            await db.examinationQuestions.bulkAdd(exam as any);
+            const lines = text.split('\n').filter(l => l.trim());
+            const headers = lines[0].split(',').map(h => h.trim().replace(/ \(.+\)/, ''));
+            const categoryQuestions: any[] = [];
+            
+            // Start from line 1 (first row of questions)
+            for (let i = 1; i < lines.length; i++) {
+              const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // Split by comma but respect quotes
+              row.forEach((q, colIndex) => {
+                if (q && headers[colIndex]) {
+                  categoryQuestions.push({
+                    category: headers[colIndex],
+                    question: q.replace(/^"|"$/g, '').trim()
+                  });
+                }
+              });
+            }
+            await db.examinationQuestions.bulkAdd(categoryQuestions);
           }
         } catch (err) {
-          console.error("Failed to load CSVs, using samples", err);
-          const plan = Papa.parse(SAMPLE_PLAN, { header: true, skipEmptyLines: true }).data;
-          await db.biblePlan.bulkAdd(plan as any);
-          const exam = Papa.parse(SAMPLE_EXAM, { header: true, skipEmptyLines: true }).data;
-          await db.examinationQuestions.bulkAdd(exam as any);
+          console.error("Failed to load CSVs", err);
         }
       }
       setIsLoading(false);
@@ -169,11 +186,20 @@ export function useResponse(sessionId: number, stepId: string) {
 
 // --- Prompts Logic ---
 export function usePrompts(planDay: number) {
-  // Logic from requirements:
-  // Week Index = floor((planDay - 1) / 7)
-  // Pools cycle based on weekIndex
-  
   const weekIndex = Math.floor((planDay - 1) / 7);
+  const processIndex = (planDay - 1) % 7;
+  
+  // Select prompts from DB for the specific category of the day
+  const categoryNames = [
+    "Logismoi", "Humility", "Prayer Examination", 
+    "Speech", "Detachment", "Acedia", "Daily Rhythm"
+  ];
+  const currentCategory = categoryNames[processIndex];
+
+  const examQuestions = useLiveQuery(
+    () => db.examinationQuestions.where('category').equals(currentCategory).toArray(),
+    [currentCategory]
+  );
 
   const meditationPools = [
     [
@@ -202,11 +228,13 @@ export function usePrompts(planDay: number) {
   };
 
   return {
+    category: currentCategory,
     meditation: [
       { id: 'med-1', question: getMeditationPrompt(0), type: 'Revelation' },
       { id: 'med-2', question: getMeditationPrompt(1), type: 'Exposure' },
       { id: 'med-3', question: getMeditationPrompt(2), type: 'Response' }
-    ]
+    ],
+    examination: examQuestions || []
   };
 }
 

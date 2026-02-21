@@ -45,11 +45,15 @@ Eremos (ἔρημος — "the desolate place where Jesus withdrew to pray") is 
 
 ## Session Flow
 1. User clicks "Start" → creates a new session for today with auto-incremented planDay
-2. Wizard walks through: Morning Consecration → Lectio Divina → 3 Meditations → 3 Examinations → Inner State → Free Prayer → Benediction
+2. Wizard walks through: Morning Consecration → Lectio Divina → 3 Meletê (Meditations) → 3 Examinations → Inner State → Free Prayer → Benediction
 3. On completion, session status changes to "completed"
 4. Completed sessions for today show "Add Reflections" → Journal page with mid-day/evening tabs
 5. Sessions can be restarted (clears responses, keeps day number) or deleted entirely
 6. Markdown export includes all responses plus journal entries
+
+## Content Rotation
+- **Examination categories**: 7 categories rotating daily (Logismoi, Humility, Prayer, Speech, Detachment, Acedia, Daily Rhythm). Within each category, 3 questions are selected from a pool of 10, offset by week so they change each week.
+- **Meditation prompts**: 3 pools (Revelation, Exposure, Response) with 6 questions each, rotating daily by planDay.
 
 ## Color Palette
 Warm contemplative parchment/stone palette: cream background, deep slate-blue primary, warm earthy neutrals.
@@ -58,11 +62,14 @@ Warm contemplative parchment/stone palette: cream background, deep slate-blue pr
 PayPal donate link in footer of landing page: `https://paypal.me/BenjaminVanScyoc`
 
 ## Recent Changes
+- 2026-02-21: Added About page with Desert Father tradition context, key terms (Lectio Divina, Meletê, Logismoi, Acedia, Consolation/Desolation)
+- 2026-02-21: Merged Closing Prayer and Benediction into single Benediction step
+- 2026-02-21: Fixed examination question rotation (changes weekly within each category)
+- 2026-02-21: Expanded meditation pools to 6 questions each, rotating daily
+- 2026-02-21: Added plain-English definitions next to unfamiliar terms in wizard steps
 - 2026-02-21: Migrated all user data from IndexedDB to server-side PostgreSQL for permanent cross-device persistence
 - 2026-02-21: Added full REST API with Express routes for all prayer data
-- 2026-02-21: Added PayPal donate button placeholder on landing page
-- 2026-02-21: Added Greek etymology for "Eremos" on landing page
-- 2026-02-21: Added scripture references to all quoted verses throughout the app
-- 2026-02-21: Added BSB Bible text display with verse highlighting
+- 2026-02-21: Added PayPal donate button on landing page
+- 2026-02-21: Added BSB Bible text display with word-level verse highlighting
 - 2026-02-21: Added morning consecration prayer and 30 rotating benedictions
 - 2026-02-21: Added Replit Auth integration (email/password, Google, GitHub, Apple)

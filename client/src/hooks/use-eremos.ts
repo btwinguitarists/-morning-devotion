@@ -236,18 +236,27 @@ export function useResponse(sessionId: number, stepId: string) {
 
 export function usePrompts(planDay: number, examQuestions?: ExaminationQuestion[]) {
   const weekIndex = Math.floor((planDay - 1) / 7);
-  const processIndex = (planDay - 1) % 7;
+  const dayIndex = (planDay - 1) % 7;
 
   const categoryNames = [
-    "Logismoi", "Humility", "Prayer Examination",
-    "Detachment", "Speech", "Acedia", "Daily Rhythm",
+    "Logismoi", "Humility", "Prayer",
+    "Speech", "Detachment", "Acedia", "Daily Rhythm",
   ];
-  const currentCategory = categoryNames[processIndex];
+  const currentCategory = categoryNames[dayIndex] || categoryNames[0];
 
   const filteredExam = useMemo(() => {
     if (!examQuestions) return [];
     return examQuestions.filter((q) => q.category.startsWith(currentCategory));
   }, [examQuestions, currentCategory]);
+
+  const selectedExam = useMemo(() => {
+    if (filteredExam.length === 0) return [];
+    const offset = weekIndex * 3;
+    return [0, 1, 2].map(i => {
+      const idx = (offset + i) % filteredExam.length;
+      return filteredExam[idx];
+    });
+  }, [filteredExam, weekIndex]);
 
   const meditationPools = [
     [
@@ -255,24 +264,31 @@ export function usePrompts(planDay: number, examQuestions?: ExaminationQuestion[
       "What does this show about how God acts?",
       "What aspect of God do I resist here?",
       "What would change if I believed this about God?",
+      "What does God promise here?",
+      "How does this passage show God's faithfulness?",
     ],
     [
       "What does this expose in me?",
       "Where do I resist this truth?",
       "What part of me is unsettled by this passage?",
       "What fear in me does this address?",
+      "What comfort am I clinging to that this challenges?",
+      "What truth here have I been avoiding?",
     ],
     [
       "What must be surrendered?",
       "What obedience is implied here?",
       "What would trust look like in response?",
       "Where is repentance needed?",
+      "What is one concrete step of obedience today?",
+      "What would change if I lived this passage out?",
     ],
   ];
 
   const getMeditationPrompt = (poolIndex: number) => {
     const pool = meditationPools[poolIndex];
-    return pool[weekIndex % pool.length];
+    const idx = (planDay - 1) % pool.length;
+    return pool[idx];
   };
 
   return {
@@ -282,7 +298,7 @@ export function usePrompts(planDay: number, examQuestions?: ExaminationQuestion[
       { id: 'med-2', question: getMeditationPrompt(1), type: 'Exposure' },
       { id: 'med-3', question: getMeditationPrompt(2), type: 'Response' },
     ],
-    examination: filteredExam,
+    examination: selectedExam,
   };
 }
 

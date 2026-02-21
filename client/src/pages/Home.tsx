@@ -242,6 +242,12 @@ export default function Home() {
             </span>
           </div>
         </div>
+
+        <div className="text-center pt-4">
+          <Link href="/about" className="text-xs text-muted-foreground/50 hover:text-primary transition-colors" data-testid="link-about-home">
+            About Eremos
+          </Link>
+        </div>
       </div>
     </div>
   );

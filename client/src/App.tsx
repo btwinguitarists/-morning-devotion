@@ -8,6 +8,7 @@ import Home from "@/pages/Home";
 import Wizard from "@/pages/Wizard";
 import Journal from "@/pages/Journal";
 import Landing from "@/pages/Landing";
+import About from "@/pages/About";
 import NotFound from "@/pages/not-found";
 
 function AuthenticatedRouter() {
@@ -16,6 +17,7 @@ function AuthenticatedRouter() {
       <Route path="/" component={Home} />
       <Route path="/wizard" component={Wizard} />
       <Route path="/journal" component={Journal} />
+      <Route path="/about" component={About} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -36,6 +38,9 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
+    if (window.location.pathname === '/about') {
+      return <About />;
+    }
     return <Landing />;
   }
 

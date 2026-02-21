@@ -25,13 +25,13 @@ import { getBenedictionForDay } from "@/lib/benedictions";
 const STEPS = [
   { id: 'prayer-open', title: 'Morning Consecration' },
   { id: 'reading', title: 'Lectio Divina' },
-  { id: 'meditation-1', title: 'Meditation I' },
-  { id: 'meditation-2', title: 'Meditation II' },
-  { id: 'meditation-3', title: 'Meditation III' },
+  { id: 'meditation-1', title: 'Meletê I' },
+  { id: 'meditation-2', title: 'Meletê II' },
+  { id: 'meditation-3', title: 'Meletê III' },
   { id: 'examination-1', title: 'Examination I' },
   { id: 'examination-2', title: 'Examination II' },
   { id: 'examination-3', title: 'Examination III' },
-  { id: 'mood', title: 'Affective State' },
+  { id: 'mood', title: 'Inner State' },
   { id: 'prayer-free', title: 'Free Prayer' },
   { id: 'prayer-close', title: 'Benediction' }
 ];
@@ -117,26 +117,32 @@ function StepContent({ stepId, sessionId, planDay, biblePlan, examQuestions }: {
     case 'reading':
       return <ReadingStep sessionId={sessionId} planDay={planDay} biblePlan={biblePlan} />;
 
+
     case 'meditation-1':
-      return <MeditationStep sessionId={sessionId} stepId={stepId} question={prompts.meditation[0].question} label="Revelation" />;
+      return <MeditationStep sessionId={sessionId} stepId={stepId} question={prompts.meditation[0].question} label="Meletê: Revelation" />;
     
     case 'meditation-2':
-      return <MeditationStep sessionId={sessionId} stepId={stepId} question={prompts.meditation[1].question} label="Exposure" />;
+      return <MeditationStep sessionId={sessionId} stepId={stepId} question={prompts.meditation[1].question} label="Meletê: Exposure" />;
 
     case 'meditation-3':
-      return <MeditationStep sessionId={sessionId} stepId={stepId} question={prompts.meditation[2].question} label="Response" />;
+      return <MeditationStep sessionId={sessionId} stepId={stepId} question={prompts.meditation[2].question} label="Meletê: Response" />;
 
     case 'examination-1':
     case 'examination-2':
     case 'examination-3': {
       const examIndex = parseInt(stepId.split('-')[1]) - 1;
       const question = prompts.examination[examIndex]?.question || "Reflect on this moment.";
+      const categoryLabel = prompts.category === 'Logismoi' 
+        ? 'Logismoi (Thought Patterns)'
+        : prompts.category === 'Acedia'
+        ? 'Acedia (Restlessness)'
+        : prompts.category;
       return (
         <PromptStep 
           sessionId={sessionId} 
           stepId={stepId} 
           question={question} 
-          label={`Examination: ${prompts.category}`} 
+          label={`Examination: ${categoryLabel}`} 
         />
       );
     }
@@ -148,7 +154,7 @@ function StepContent({ stepId, sessionId, planDay, biblePlan, examQuestions }: {
       return <PromptStep sessionId={sessionId} stepId={stepId} question="Speak freely to your Father." label="Prayer" placeholder="Write your prayer here..." />;
 
     case 'prayer-close':
-      return <ClosingPrayer sessionId={sessionId} planDay={planDay} />;
+      return <BenedictionStep sessionId={sessionId} planDay={planDay} />;
 
     default:
       return null;
@@ -200,36 +206,30 @@ function MorningPrayer() {
   );
 }
 
-function ClosingPrayer({ sessionId, planDay }: { sessionId: number, planDay: number }) {
+function BenedictionStep({ sessionId, planDay }: { sessionId: number, planDay: number }) {
   const benediction = getBenedictionForDay(planDay);
 
   return (
-    <div className="flex flex-col items-center text-center space-y-10 animate-in" data-testid="closing-prayer">
-      <div className="space-y-6 max-w-lg text-lg font-serif leading-relaxed text-muted-foreground">
-        <h1 className="text-3xl md:text-4xl font-serif text-primary mb-8">Closing Prayer</h1>
+    <div className="flex flex-col items-center text-center space-y-10 animate-in" data-testid="benediction-step">
+      <div className="space-y-8 max-w-lg">
+        <h1 className="text-3xl md:text-4xl font-serif text-primary">Benediction</h1>
+        <p className="text-xs text-muted-foreground/50 tracking-wide">A blessing to carry with you</p>
 
-        <p className="text-foreground">Lord Jesus Christ,</p>
-        <p>You are my righteousness,</p>
-        <p>my life,</p>
-        <p>and my victory.</p>
+        <div className="space-y-1">
+          <blockquote className="font-serif text-lg md:text-xl leading-relaxed text-foreground italic pl-4 border-l-2 border-primary/30">
+            {benediction.text}
+          </blockquote>
+          <p className="text-sm text-primary/70 font-medium pt-3">{benediction.reference}</p>
+        </div>
 
-        <p className="mt-4 text-foreground font-medium">I receive Your grace for this day.</p>
-
-        <p className="mt-4">The grace of the Lord Jesus Christ,</p>
-        <p>the love of God,</p>
-        <p>and the fellowship of the Holy Spirit</p>
-        <p>be with me and remain with me.</p>
-        <p className="text-xs text-primary/50 mt-2 tracking-wide">— 2 Corinthians 13:14</p>
-
-        <p className="text-primary font-medium text-xl mt-6">Amen.</p>
-      </div>
-
-      <div className="w-full max-w-lg border-t border-primary/10 pt-8 mt-4">
-        <span className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Today's Benediction</span>
-        <p className="text-sm text-primary/70 font-medium mt-1 mb-4">{benediction.reference}</p>
-        <blockquote className="font-serif text-base md:text-lg leading-relaxed text-foreground italic pl-4 border-l-2 border-primary/30">
-          {benediction.text}
-        </blockquote>
+        <div className="border-t border-primary/10 pt-8 space-y-4 text-lg font-serif text-muted-foreground leading-relaxed">
+          <p>The grace of the Lord Jesus Christ,</p>
+          <p>the love of God,</p>
+          <p>and the fellowship of the Holy Spirit</p>
+          <p>be with you and remain with you.</p>
+          <p className="text-xs text-primary/50 mt-2 tracking-wide">— 2 Corinthians 13:14</p>
+          <p className="text-primary font-medium text-xl mt-4">Amen.</p>
+        </div>
       </div>
 
       <div className="pt-4">
@@ -289,7 +289,8 @@ function ReadingStep({ sessionId, planDay, biblePlan }: { sessionId: number, pla
     <div className="space-y-6 animate-in" data-testid="reading-step">
       <div className="space-y-2">
         <span className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Day {planDay}</span>
-        <h1 className="text-3xl font-serif text-primary">Scripture Reading</h1>
+        <h1 className="text-3xl font-serif text-primary">Lectio Divina</h1>
+        <p className="text-xs text-muted-foreground/60 italic">Prayerful reading — not to study, but to listen</p>
       </div>
 
       {chapters.length > 1 && (
@@ -391,6 +392,9 @@ function MeditationStep({ sessionId, stepId, question, label }: { sessionId: num
       <HighlightBanner sessionId={sessionId} />
       <div className="mb-8 space-y-4">
         <span className="text-xs font-bold tracking-widest uppercase text-muted-foreground">{label}</span>
+        {stepId === 'meditation-1' && (
+          <p className="text-xs text-muted-foreground/60 italic">Ruminating on Scripture — turning it over in your heart</p>
+        )}
         <h2 className="text-2xl md:text-3xl font-serif text-primary leading-tight">{question}</h2>
       </div>
       
@@ -434,8 +438,9 @@ function MoodStep({ sessionId }: { sessionId: number }) {
   return (
     <div className="space-y-8 animate-in max-w-md mx-auto w-full">
       <div className="space-y-2 text-center mb-12">
-        <h1 className="text-3xl font-serif text-primary">Name Your State</h1>
+        <h1 className="text-3xl font-serif text-primary">Name Your Inner State</h1>
         <p className="text-muted-foreground">Where is your heart right now?</p>
+        <p className="text-xs text-muted-foreground/60 italic">From desolation (dryness, distance) to consolation (peace, nearness)</p>
       </div>
       
       <MoodSlider

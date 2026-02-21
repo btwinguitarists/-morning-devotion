@@ -253,3 +253,65 @@ export function useMood(sessionId: number) {
 
   return { mood, saveMood };
 }
+
+// --- Export Helper ---
+export async function exportSessionToMarkdown(sessionId: number) {
+  const session = await db.sessions.get(sessionId);
+  if (!session) return;
+
+  const responses = await db.responses.where('sessionId').equals(sessionId).toArray();
+  const mood = await db.moodEntries.where('sessionId').equals(sessionId).first();
+  const checklist = await db.checklistItems.where('sessionId').equals(sessionId).toArray();
+
+  let md = `# Eremos Session - ${session.date}\n\n`;
+  md += `**Day:** ${session.planDay}\n`;
+  if (mood) {
+    md += `**Mood:** ${mood.value}/10\n`;
+    if (mood.note) md += `**Mood Note:** ${mood.note}\n`;
+  }
+  md += `\n---\n\n`;
+
+  md += `## Scripture Readings\n`;
+  checklist.forEach(item => {
+    md += `- [${item.completed ? 'x' : ' '}] ${item.reference}\n`;
+  });
+  md += `\n`;
+
+  const stepOrder = [
+    'meditation-1', 'meditation-2', 'meditation-3',
+    'examination-1', 'examination-2', 'examination-3',
+    'prayer-free'
+  ];
+
+  const labels: Record<string, string> = {
+    'meditation-1': 'Meditation I (Revelation)',
+    'meditation-2': 'Meditation II (Exposure)',
+    'meditation-3': 'Meditation III (Response)',
+    'examination-1': 'Examination I',
+    'examination-2': 'Examination II',
+    'examination-3': 'Examination III',
+    'prayer-free': 'Free Prayer'
+  };
+
+  stepOrder.forEach(stepId => {
+    const resp = responses.find(r => r.stepId === stepId);
+    if (resp && resp.answerText) {
+      md += `### ${labels[stepId] || stepId}\n`;
+      md += `*${resp.questionTextSnapshot}*\n\n`;
+      md += `${resp.answerText}\n\n`;
+    }
+  });
+
+  md += `\n---\n*Amen.*`;
+
+  // Download logic
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `eremos-session-${session.date}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

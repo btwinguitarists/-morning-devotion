@@ -13,7 +13,9 @@ import { AutoTextArea } from "@/components/AutoTextArea";
 import { MoodSlider } from "@/components/MoodSlider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { exportSessionToMarkdown } from "@/hooks/use-eremos";
 
 // Wizard Steps Definition
 const STEPS = [
@@ -154,11 +156,21 @@ function StepContent({ stepId, sessionId, planDay }: { stepId: string, sessionId
 
     case 'prayer-close':
       return (
-        <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in">
+        <div className="flex flex-col items-center justify-center text-center space-y-8 animate-in">
           <h1 className="text-5xl font-serif text-primary">Amen.</h1>
           <p className="text-muted-foreground text-lg max-w-md">
             Go in peace. The Lord is with you.
           </p>
+          <div className="pt-8">
+            <Button 
+              variant="outline" 
+              onClick={() => exportSessionToMarkdown(sessionId)}
+              className="gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export Session (Markdown)
+            </Button>
+          </div>
         </div>
       );
 

@@ -1,13 +1,19 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useCurrentSession, useEremosData } from "@/hooks/use-eremos";
-import { Loader2, ArrowRight, BookOpen, Clock, Calendar } from "lucide-react";
+import { useCurrentSession, useEremosData, exportSessionToMarkdown } from "@/hooks/use-eremos";
+import { Loader2, ArrowRight, BookOpen, Clock, Calendar, History, Download } from "lucide-react";
 import { format } from "date-fns";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "@/lib/db";
 
 export default function Home() {
   const { isLoading } = useEremosData();
   const { session, startNewSession } = useCurrentSession();
+
+  const history = useLiveQuery(
+    () => db.sessions.where('status').equals('completed').reverse().limit(5).toArray()
+  );
 
   const handleStart = async () => {
     if (!session) {
@@ -26,7 +32,7 @@ export default function Home() {
   const today = format(new Date(), "EEEE, MMMM do");
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 py-12">
       <div className="max-w-md w-full space-y-12">
         
         {/* Header */}
@@ -68,17 +74,45 @@ export default function Home() {
           </Link>
         </Card>
 
+        {/* History Section */}
+        {history && history.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground px-2">
+              <History className="w-3 h-3" />
+              Recent History
+            </div>
+            <div className="grid gap-2">
+              {history.map((s) => (
+                <div key={s.id} className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-primary/10 transition-colors group">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{format(new Date(s.date), "MMM d, yyyy")}</span>
+                    <span className="text-xs text-muted-foreground font-serif italic">Day {s.planDay}</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => exportSessionToMarkdown(s.id!)}
+                  >
+                    <Download className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Stats / Footer */}
         <div className="grid grid-cols-2 gap-4">
           <div className="p-4 rounded-xl bg-secondary/50 flex flex-col items-center gap-2 text-center">
             <BookOpen className="w-5 h-5 text-muted-foreground" />
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Plan</span>
-            <span className="font-serif text-lg">Day {session?.planDay || 1}</span>
+            <span className="font-serif text-lg">Day {session?.planDay || (history?.[0]?.planDay ? history[0].planDay + 1 : 1)}</span>
           </div>
           <div className="p-4 rounded-xl bg-secondary/50 flex flex-col items-center gap-2 text-center">
             <Clock className="w-5 h-5 text-muted-foreground" />
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Duration</span>
-            <span className="font-serif text-lg">-- min</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Status</span>
+            <span className="font-serif text-lg">{session ? "In Progress" : "Ready"}</span>
           </div>
         </div>
       </div>

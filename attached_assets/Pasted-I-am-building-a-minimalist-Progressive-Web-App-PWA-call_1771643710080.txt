@@ -1,0 +1,209 @@
+I am building a minimalist Progressive Web App (PWA) called Eremos.
+
+Purpose:
+A structured solitude and Scripture meditation journaling app based on a 365-day reading plan and rotating Desert-style examination questions.
+
+This is a personal tool (not commercial). It must be:
+	•	Minimalist
+	•	Distraction-free
+	•	Local-first (IndexedDB storage)
+	•	Offline capable
+	•	Installable as a PWA
+	•	No login required
+	•	No backend initially
+	•	Autosave on every keystroke
+	•	One prompt per screen (no scrolling through multiple prompts)
+
+⸻
+
+CORE CONCEPT
+
+Daily structure:
+	1.	Morning Prayer (static text)
+	2.	Reading Checklist (from 365-day CSV)
+	3.	Scripture Meditation (3 prompts, rotating weekly from a structured pool)
+	4.	Desert Examination (3 prompts, rotating category weekly)
+	5.	Mood Naming (1–10 scale + short text)
+	6.	Free-form Prayer
+	7.	Closing Prayer (static)
+
+Each prompt must be presented one at a time in a turn-by-turn wizard flow.
+
+Progress indicator should show current step number out of total steps.
+
+Autosave must occur on every input change.
+
+⸻
+
+TECH STACK REQUIREMENTS
+	•	Next.js (React)
+	•	Tailwind CSS for styling
+	•	Dexie.js for IndexedDB
+	•	PWA enabled (manifest + service worker)
+	•	Works offline
+	•	Clean white background, black text
+	•	No gamification
+	•	No streaks
+	•	No notifications
+
+⸻
+
+ROTATION LOGIC
+
+There are 7 rotating Desert categories:
+	1.	Logismoi
+	2.	Humility
+	3.	Prayer Examination
+	4.	Speech
+	5.	Detachment
+	6.	Acedia
+	7.	Daily Rhythm
+
+Rotation logic:
+
+processIndex = (planDay - 1) % 7
+
+Scripture Meditation always runs daily.
+
+Scripture Meditation prompts rotate weekly from 3 pools:
+
+Pool 1 (Revelation):
+	•	What does this reveal about God’s character?
+	•	What does this show about how God acts?
+	•	What aspect of God do I resist here?
+	•	What would change if I believed this about God?
+
+Pool 2 (Exposure):
+	•	What does this expose in me?
+	•	Where do I resist this truth?
+	•	What part of me is unsettled by this passage?
+	•	What fear in me does this address?
+
+Pool 3 (Response):
+	•	What must be surrendered?
+	•	What obedience is implied here?
+	•	What would trust look like in response?
+	•	Where is repentance needed?
+
+Weekly rotation:
+weekIndex = Math.floor((planDay - 1) / 7) % poolLength
+
+Select prompt at weekIndex from each pool.
+
+⸻
+
+DESERT EXAMINATION QUESTIONS (3 PER CATEGORY)
+
+Logismoi:
+	•	What thought has most occupied my mind today?
+	•	Did I entertain it or resist it?
+	•	What desire is beneath it?
+
+Humility:
+	•	Where did I seek recognition?
+	•	Was I disturbed when overlooked or corrected?
+	•	Did I judge another inwardly?
+
+Prayer Examination:
+	•	Was my prayer distracted?
+	•	Did I cling to anxiety in prayer?
+	•	Did prayer soften me afterward?
+
+Speech:
+	•	Was what I said necessary?
+	•	Did my words seek approval?
+	•	Did my speech create peace or agitation?
+
+Detachment:
+	•	What loss or inconvenience disturbed me?
+	•	What am I clinging to?
+	•	Would I remain at peace if misunderstood?
+
+Acedia:
+	•	Did I crave distraction?
+	•	Did I resent my place or task?
+	•	Did discouragement distort reality?
+
+Daily Rhythm:
+	•	What thought greeted me this morning?
+	•	What interior disturbance surfaced today?
+	•	Where did I resist humility?
+
+⸻
+
+READING PLAN
+
+Load reading plan from CSV file with columns:
+
+Day
+Torah/History
+Wisdom
+Prophets
+New Testament
+
+Display reading references as checklist cards.
+
+Allow user to mark each as completed.
+
+⸻
+
+DATA STORAGE STRUCTURE
+
+Use IndexedDB via Dexie.
+
+Tables:
+
+readingPlan
+sessions
+responses
+moodEntries
+
+Each session stores:
+	•	date
+	•	planDay
+	•	completion status
+
+Each response stores:
+	•	sessionId
+	•	questionTextSnapshot
+	•	answerText
+	•	category
+	•	updatedAt
+
+Autosave on every keystroke.
+
+⸻
+
+UI REQUIREMENTS
+	•	One prompt per screen
+	•	Large text input
+	•	Back / Next buttons
+	•	Small progress indicator
+	•	No scrolling across multiple prompts
+	•	Reading panel accessible via modal without losing session progress
+	•	Resume incomplete session automatically
+
+⸻
+
+MORNING PRAYER (STATIC TEXT)
+
+[PASTE YOUR MORNING PRAYER HERE]
+
+⸻
+
+CLOSING PRAYER
+
+Placeholder: simple “Amen.” (can be expanded later)
+
+⸻
+
+Generate:
+	1.	Full project structure
+	2.	PWA configuration
+	3.	IndexedDB schema
+	4.	Wizard session engine
+	5.	Reading plan loader
+	6.	Rotation logic
+	7.	Autosave logic
+
+Make code clean, modular, and minimal.

@@ -3,6 +3,7 @@ import { db, type Session, type Response, type ChecklistItem } from "@/lib/db";
 import { useState, useEffect, useCallback } from "react";
 import Papa from "papaparse";
 import { format } from "date-fns";
+import { parseAllReferences } from "@/lib/bible";
 
 // --- Seed Data Helper ---
 // In a real app, this would load from CSVs in /public/data
@@ -160,16 +161,25 @@ export function useReadingPlan(planDay: number) {
 export function useChecklist(sessionId: number, referencesStr?: string) {
   const items = useLiveQuery(() => db.checklistItems.where('sessionId').equals(sessionId).toArray(), [sessionId]);
 
-  // Initialize checklist items if they don't exist yet for this session
   useEffect(() => {
     if (referencesStr && items && items.length === 0) {
-      const refs = referencesStr.split(/[,;]/).map(r => r.trim()).filter(Boolean);
-      const newItems = refs.map(ref => ({
-        sessionId,
-        reference: ref,
-        completed: false
-      }));
-      db.checklistItems.bulkAdd(newItems);
+      const chapters = parseAllReferences(referencesStr);
+      if (chapters.length > 0) {
+        const newItems = chapters.map((ch: any) => ({
+          sessionId,
+          reference: ch.label,
+          completed: false
+        }));
+        db.checklistItems.bulkAdd(newItems);
+      } else {
+        const refs = referencesStr.split(/[,;]/).map((r: string) => r.trim()).filter(Boolean);
+        const newItems = refs.map((ref: string) => ({
+          sessionId,
+          reference: ref,
+          completed: false
+        }));
+        db.checklistItems.bulkAdd(newItems);
+      }
     }
   }, [sessionId, referencesStr, items]);
 

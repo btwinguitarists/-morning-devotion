@@ -47,6 +47,17 @@ export interface MoodEntry {
   note: string;
 }
 
+export interface Highlight {
+  id?: number;
+  sessionId: number;
+  bookId: string;
+  chapter: number;
+  verseStart: number;
+  verseEnd: number;
+  text: string;
+  createdAt: number;
+}
+
 export class EremosDB extends Dexie {
   biblePlan!: Table<BiblePlanEntry>;
   examinationQuestions!: Table<ExaminationQuestion>;
@@ -54,6 +65,7 @@ export class EremosDB extends Dexie {
   responses!: Table<Response>;
   checklistItems!: Table<ChecklistItem>;
   moodEntries!: Table<MoodEntry>;
+  highlights!: Table<Highlight>;
 
   constructor() {
     super('EremosDB');
@@ -64,6 +76,15 @@ export class EremosDB extends Dexie {
       responses: '++id, [sessionId+stepId]',
       checklistItems: '++id, sessionId',
       moodEntries: '++id, sessionId'
+    });
+    this.version(5).stores({
+      biblePlan: '++id, day',
+      examinationQuestions: '++id, category',
+      sessions: '++id, date, status, userId, [userId+date], [userId+status]',
+      responses: '++id, [sessionId+stepId]',
+      checklistItems: '++id, sessionId',
+      moodEntries: '++id, sessionId',
+      highlights: '++id, sessionId, [sessionId+bookId+chapter]'
     });
   }
 }

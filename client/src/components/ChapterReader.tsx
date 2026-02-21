@@ -1,0 +1,325 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
+import { fetchChapter, type ChapterData } from "@/lib/bible";
+import { db } from "@/lib/db";
+import { Button } from "@/components/ui/button";
+import { Loader2, BookOpen, Highlighter, Check } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+
+interface ChapterReaderProps {
+  bookId: string;
+  bookName: string;
+  chapter: number;
+  sessionId: number;
+  onMarkRead: () => void;
+  isRead: boolean;
+}
+
+export function ChapterReader({
+  bookId,
+  bookName,
+  chapter,
+  sessionId,
+  onMarkRead,
+  isRead,
+}: ChapterReaderProps) {
+  const [chapterData, setChapterData] = useState<ChapterData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [floatingBtn, setFloatingBtn] = useState<{
+    x: number;
+    y: number;
+    text: string;
+    verseStart: number;
+    verseEnd: number;
+  } | null>(null);
+  const [highlightsOpen, setHighlightsOpen] = useState(false);
+
+  const textRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchChapter(bookId, chapter)
+      .then((data) => {
+        if (!cancelled) {
+          setChapterData(data);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bookId, chapter]);
+
+  const highlights = useLiveQuery(
+    () =>
+      db.highlights
+        .where("[sessionId+bookId+chapter]")
+        .equals([sessionId, bookId, chapter])
+        .toArray(),
+    [sessionId, bookId, chapter],
+    []
+  );
+
+  const highlightedVerses = new Set<number>();
+  if (highlights) {
+    for (const h of highlights) {
+      for (let v = h.verseStart; v <= h.verseEnd; v++) {
+        highlightedVerses.add(v);
+      }
+    }
+  }
+
+  const getVerseFromNode = useCallback((node: Node | null): number | null => {
+    if (!node) return null;
+    let el: HTMLElement | null =
+      node.nodeType === Node.TEXT_NODE
+        ? (node.parentElement as HTMLElement)
+        : (node as HTMLElement);
+    while (el) {
+      const verse = el.getAttribute?.("data-verse");
+      if (verse) return parseInt(verse, 10);
+      el = el.parentElement;
+    }
+    return null;
+  }, []);
+
+  const handleTextSelect = useCallback(() => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+      setFloatingBtn(null);
+      return;
+    }
+
+    const selectedText = selection.toString().trim();
+    if (!selectedText) {
+      setFloatingBtn(null);
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const startVerse = getVerseFromNode(range.startContainer);
+    const endVerse = getVerseFromNode(range.endContainer);
+
+    if (startVerse === null || endVerse === null) {
+      setFloatingBtn(null);
+      return;
+    }
+
+    const rect = range.getBoundingClientRect();
+    const containerRect = textRef.current?.getBoundingClientRect();
+    if (!containerRect) return;
+
+    setFloatingBtn({
+      x: rect.left + rect.width / 2 - containerRect.left,
+      y: rect.top - containerRect.top - 40,
+      text: selectedText,
+      verseStart: Math.min(startVerse, endVerse),
+      verseEnd: Math.max(startVerse, endVerse),
+    });
+  }, [getVerseFromNode]);
+
+  const saveHighlight = useCallback(async () => {
+    if (!floatingBtn) return;
+    await db.highlights.add({
+      sessionId,
+      bookId,
+      chapter,
+      verseStart: floatingBtn.verseStart,
+      verseEnd: floatingBtn.verseEnd,
+      text: floatingBtn.text,
+      createdAt: Date.now(),
+    });
+    setFloatingBtn(null);
+    window.getSelection()?.removeAllRanges();
+  }, [floatingBtn, sessionId, bookId, chapter]);
+
+  const deleteHighlight = useCallback(async (id: number) => {
+    await db.highlights.delete(id);
+  }, []);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (
+        floatingBtn &&
+        !(e.target as HTMLElement)?.closest("[data-testid='button-highlight']")
+      ) {
+        setTimeout(() => {
+          const sel = window.getSelection();
+          if (!sel || sel.isCollapsed) {
+            setFloatingBtn(null);
+          }
+        }, 100);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [floatingBtn]);
+
+  if (loading) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center py-16 gap-3"
+        data-testid="loading-chapter"
+      >
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground font-serif">
+          Loading {bookName} {chapter}...
+        </p>
+      </div>
+    );
+  }
+
+  if (!chapterData || chapterData.verses.length === 0) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center py-16 gap-3"
+        data-testid="empty-chapter"
+      >
+        <BookOpen className="h-6 w-6 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Chapter not available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center mb-6">
+        <h2
+          className="font-serif text-xl font-light text-muted-foreground"
+          data-testid="text-chapter-title"
+        >
+          {bookName} {chapter}
+        </h2>
+      </div>
+
+      <div
+        ref={textRef}
+        className="relative"
+        onMouseUp={handleTextSelect}
+        onTouchEnd={handleTextSelect}
+      >
+        {floatingBtn && (
+          <div
+            className="absolute z-50"
+            style={{
+              left: `${floatingBtn.x}px`,
+              top: `${floatingBtn.y}px`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={saveHighlight}
+              className="shadow-md gap-1"
+              data-testid="button-highlight"
+            >
+              <Highlighter className="h-3 w-3" />
+              Highlight
+            </Button>
+          </div>
+        )}
+
+        <p className="font-serif text-lg leading-relaxed text-foreground">
+          {chapterData.verses.map((v) => {
+            const isHighlighted = highlightedVerses.has(v.number);
+            return (
+              <span
+                key={v.number}
+                data-verse={v.number}
+                className={
+                  isHighlighted
+                    ? "bg-amber-100/60 dark:bg-amber-900/30 rounded-sm"
+                    : ""
+                }
+              >
+                <sup className="text-xs text-muted-foreground/50 mr-0.5 select-none">
+                  {v.number}
+                </sup>
+                {v.text}{" "}
+              </span>
+            );
+          })}
+        </p>
+      </div>
+
+      {highlights && highlights.length > 0 && (
+        <Collapsible
+          open={highlightsOpen}
+          onOpenChange={setHighlightsOpen}
+          className="mt-6"
+        >
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground"
+              data-testid="button-toggle-highlights"
+            >
+              <Highlighter className="h-3.5 w-3.5" />
+              {highlights.length} highlight{highlights.length !== 1 ? "s" : ""}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 space-y-2">
+            {highlights.map((h) => (
+              <div
+                key={h.id}
+                className="flex items-start gap-2 group"
+                data-testid={`highlight-item-${h.id}`}
+              >
+                <div className="flex-1 bg-amber-100/60 dark:bg-amber-900/30 rounded-md px-3 py-2">
+                  <p className="text-sm font-serif italic text-foreground/80">
+                    "{h.text}"
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    vv. {h.verseStart}
+                    {h.verseEnd !== h.verseStart ? `–${h.verseEnd}` : ""}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="invisible group-hover:visible shrink-0 text-muted-foreground"
+                  onClick={() => h.id && deleteHighlight(h.id)}
+                  data-testid={`button-delete-highlight-${h.id}`}
+                >
+                  <span className="text-xs">x</span>
+                </Button>
+              </div>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      <div className="flex justify-center pt-4">
+        <Button
+          onClick={onMarkRead}
+          variant={isRead ? "secondary" : "default"}
+          disabled={isRead}
+          className="gap-2"
+          data-testid="button-mark-read"
+        >
+          {isRead ? (
+            <>
+              <Check className="h-4 w-4" />
+              Read
+            </>
+          ) : (
+            <>
+              <BookOpen className="h-4 w-4" />
+              Mark as Read
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}

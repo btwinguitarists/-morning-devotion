@@ -95,10 +95,13 @@ export function useCurrentSession() {
     return s;
   });
 
-  const startNewSession = async () => {
-    // Calculate the next plan day based on history
-    const lastCompleted = await db.sessions.where('status').equals('completed').last();
-    const nextDay = (lastCompleted?.planDay || 0) + 1;
+  const startNewSession = async (dayOverride?: number) => {
+    // Calculate the next plan day based on history unless overridden
+    let nextDay = dayOverride;
+    if (nextDay === undefined) {
+      const lastCompleted = await db.sessions.where('status').equals('completed').last();
+      nextDay = (lastCompleted?.planDay || 0) + 1;
+    }
 
     const id = await db.sessions.add({
       date: today,
@@ -189,7 +192,6 @@ export function usePrompts(planDay: number) {
   const weekIndex = Math.floor((planDay - 1) / 7);
   const processIndex = (planDay - 1) % 7;
   
-  // Select prompts from DB for the specific category of the day
   const categoryNames = [
     "Logismoi", "Humility", "Prayer Examination", 
     "Speech", "Detachment", "Acedia", "Daily Rhythm"
@@ -197,7 +199,7 @@ export function usePrompts(planDay: number) {
   const currentCategory = categoryNames[processIndex];
 
   const examQuestions = useLiveQuery(
-    () => db.examinationQuestions.where('category').equals(currentCategory).toArray(),
+    () => db.examinationQuestions.where('category').startsWith(currentCategory).toArray(),
     [currentCategory]
   );
 
@@ -262,8 +264,9 @@ export async function exportSessionToMarkdown(sessionId: number) {
   const responses = await db.responses.where('sessionId').equals(sessionId).toArray();
   const mood = await db.moodEntries.where('sessionId').equals(sessionId).first();
   const checklist = await db.checklistItems.where('sessionId').equals(sessionId).toArray();
+  const plan = await db.biblePlan.where('day').equals(session.planDay).first();
 
-  let md = `# Eremos Session - ${session.date}\n\n`;
+  let md = `# ${session.date} - Eremos Session\n\n`;
   md += `**Day:** ${session.planDay}\n`;
   if (mood) {
     md += `**Mood:** ${mood.value}/10\n`;
@@ -272,9 +275,17 @@ export async function exportSessionToMarkdown(sessionId: number) {
   md += `\n---\n\n`;
 
   md += `## Scripture Readings\n`;
-  checklist.forEach(item => {
-    md += `- [${item.completed ? 'x' : ' '}] ${item.reference}\n`;
-  });
+  if (plan && plan.references) {
+    const refs = plan.references.split(/[,;]/).map(r => r.trim()).filter(Boolean);
+    refs.forEach(ref => {
+      const isCompleted = checklist.find(c => c.reference === ref)?.completed;
+      md += `- [${isCompleted ? 'x' : ' '}] ${ref}\n`;
+    });
+  } else {
+    checklist.forEach(item => {
+      md += `- [${item.completed ? 'x' : ' '}] ${item.reference}\n`;
+    });
+  }
   md += `\n`;
 
   const stepOrder = [
@@ -309,7 +320,7 @@ export async function exportSessionToMarkdown(sessionId: number) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `eremos-session-${session.date}.md`;
+  a.download = `${session.date}-eremos-day-${session.planDay}.md`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

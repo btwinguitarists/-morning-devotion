@@ -2,14 +2,18 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCurrentSession, useEremosData, exportSessionToMarkdown } from "@/hooks/use-eremos";
-import { Loader2, ArrowRight, BookOpen, Clock, Calendar, History, Download } from "lucide-react";
+import { Loader2, ArrowRight, BookOpen, Clock, Calendar, History, Download, Settings2 } from "lucide-react";
 import { format } from "date-fns";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export default function Home() {
   const { isLoading } = useEremosData();
   const { session, startNewSession } = useCurrentSession();
+  const [dayOverride, setDayOverride] = useState<string>("");
 
   const history = useLiveQuery(
     () => db.sessions.where('status').equals('completed').reverse().limit(5).toArray()
@@ -17,7 +21,8 @@ export default function Home() {
 
   const handleStart = async () => {
     if (!session) {
-      await startNewSession();
+      const day = dayOverride ? parseInt(dayOverride) : undefined;
+      await startNewSession(day);
     }
   };
 
@@ -30,6 +35,7 @@ export default function Home() {
   }
 
   const today = format(new Date(), "EEEE, MMMM do");
+  const currentPlanDay = session?.planDay || (history?.[0]?.planDay ? history[0].planDay + 1 : 1);
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 py-12">
@@ -50,7 +56,34 @@ export default function Home() {
         </div>
 
         {/* Main Action Card */}
-        <Card className="p-8 border-border shadow-2xl shadow-black/5 flex flex-col gap-6 items-center text-center hover:border-primary/20 transition-all duration-500">
+        <Card className="p-8 border-border shadow-2xl shadow-black/5 flex flex-col gap-6 items-center text-center hover:border-primary/20 transition-all duration-500 relative">
+          {!session && (
+            <div className="absolute top-4 right-4">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
+                    <Settings2 className="w-4 h-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-4 space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start on Day</label>
+                    <Input 
+                      type="number" 
+                      placeholder={String(currentPlanDay)}
+                      value={dayOverride}
+                      onChange={(e) => setDayOverride(e.target.value)}
+                      className="h-8"
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Override the default progression if you missed days or want to jump ahead.
+                  </p>
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+
           <div className="space-y-2">
             <h2 className="text-2xl font-serif font-medium">
               {session ? "Continue Session" : "Begin Morning Prayer"}
@@ -58,7 +91,7 @@ export default function Home() {
             <p className="text-muted-foreground">
               {session 
                 ? `You are on step ${(session.currentStep || 0) + 1} of your daily rhythm.`
-                : "Enter into silence. Prepare your heart."}
+                : `Enter into silence. Prepare for Day ${dayOverride || currentPlanDay}.`}
             </p>
           </div>
 
@@ -107,7 +140,7 @@ export default function Home() {
           <div className="p-4 rounded-xl bg-secondary/50 flex flex-col items-center gap-2 text-center">
             <BookOpen className="w-5 h-5 text-muted-foreground" />
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Current Plan</span>
-            <span className="font-serif text-lg">Day {session?.planDay || (history?.[0]?.planDay ? history[0].planDay + 1 : 1)}</span>
+            <span className="font-serif text-lg">Day {currentPlanDay}</span>
           </div>
           <div className="p-4 rounded-xl bg-secondary/50 flex flex-col items-center gap-2 text-center">
             <Clock className="w-5 h-5 text-muted-foreground" />

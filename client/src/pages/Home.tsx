@@ -80,6 +80,7 @@ export default function Home() {
           <p className="text-muted-foreground font-serif italic text-lg">
             "Be still and know that I am God."
           </p>
+          <p className="text-xs text-muted-foreground/50 tracking-wide uppercase">Psalm 46:10</p>
         </div>
 
         {/* Date Display */}

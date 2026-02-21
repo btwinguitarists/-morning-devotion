@@ -216,6 +216,7 @@ function ClosingPrayer({ sessionId, planDay }: { sessionId: number, planDay: num
         <p>the love of God,</p>
         <p>and the fellowship of the Holy Spirit</p>
         <p>be with me and remain with me.</p>
+        <p className="text-xs text-primary/50 mt-2 tracking-wide">— 2 Corinthians 13:14</p>
 
         <p className="text-primary font-medium text-xl mt-6">Amen.</p>
       </div>

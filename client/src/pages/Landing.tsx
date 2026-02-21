@@ -11,11 +11,14 @@ export default function Landing() {
             <h1 className="text-6xl md:text-7xl font-serif tracking-tight text-primary" data-testid="text-landing-title">
               Eremos
             </h1>
-            <p className="text-xl font-serif italic text-muted-foreground leading-relaxed">
-              "Go into your room, close the door, and pray to your Father who is in secret."
+            <p className="text-xs text-muted-foreground/60 tracking-widest uppercase">
+              ἔρημος · the desolate place where Jesus withdrew to pray
+            </p>
+            <p className="text-xl font-serif italic text-muted-foreground leading-relaxed mt-4">
+              "Very early in the morning, while it was still dark, Jesus got up, left the house and went off to a solitary place, where he prayed."
             </p>
             <p className="text-sm text-muted-foreground tracking-wide uppercase">
-              Matthew 6:6
+              Mark 1:35
             </p>
           </div>
 
@@ -67,7 +70,7 @@ export default function Landing() {
       </div>
 
       <footer className="p-6 text-center text-xs text-muted-foreground border-t border-border/30">
-        A place of solitude for daily prayer and reflection.
+        A solitary place for daily prayer and reflection.
       </footer>
     </div>
   );

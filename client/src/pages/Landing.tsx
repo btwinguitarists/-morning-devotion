@@ -72,7 +72,7 @@ export default function Landing() {
       <footer className="p-6 text-center space-y-3 border-t border-border/30">
         <p className="text-xs text-muted-foreground">A solitary place for daily prayer and reflection.</p>
         <a 
-          href="https://paypal.me/placeholder" 
+          href="https://paypal.me/BenjaminVanScyoc" 
           target="_blank" 
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-primary transition-colors"

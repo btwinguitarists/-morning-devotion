@@ -55,7 +55,7 @@ Eremos (ἔρημος — "the desolate place where Jesus withdrew to pray") is 
 Warm contemplative parchment/stone palette: cream background, deep slate-blue primary, warm earthy neutrals.
 
 ## Donation
-PayPal donate link in footer of landing page. URL placeholder at `https://paypal.me/placeholder` — update when user provides their PayPal link.
+PayPal donate link in footer of landing page: `https://paypal.me/BenjaminVanScyoc`
 
 ## Recent Changes
 - 2026-02-21: Migrated all user data from IndexedDB to server-side PostgreSQL for permanent cross-device persistence

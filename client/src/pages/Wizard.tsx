@@ -61,7 +61,9 @@ export default function Wizard() {
       setStepIndex(next);
       await updateStep(session.id!, next);
     } else {
-      await completeSession(session.id!);
+      if (session.status !== 'completed') {
+        await completeSession(session.id!);
+      }
       setLocation('/');
     }
   };

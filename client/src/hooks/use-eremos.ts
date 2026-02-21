@@ -85,14 +85,12 @@ export function useCurrentSession() {
   const today = format(new Date(), 'yyyy-MM-dd');
   
   const session = useLiveQuery(async () => {
-    // Try to find today's session first
-    let s = await db.sessions.where('date').equals(today).first();
+    // Try to find today's session first (even if completed)
+    const todaySession = await db.sessions.where('date').equals(today).first();
+    if (todaySession) return todaySession;
     
-    // If not, find the most recent in-progress one (maybe from yesterday)
-    if (!s) {
-      s = await db.sessions.where('status').equals('in-progress').last();
-    }
-    return s;
+    // If no today session, find the most recent in-progress one (maybe from yesterday)
+    return await db.sessions.where('status').equals('in-progress').last();
   });
 
   const startNewSession = async (dayOverride?: number) => {

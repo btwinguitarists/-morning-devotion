@@ -86,11 +86,13 @@ export default function Home() {
 
           <div className="space-y-2">
             <h2 className="text-2xl font-serif font-medium">
-              {session ? "Continue Session" : "Begin Morning Prayer"}
+              {session ? (session.status === 'completed' ? "Add Reflections" : "Continue Session") : "Begin Morning Prayer"}
             </h2>
             <p className="text-muted-foreground">
               {session 
-                ? `You are on step ${(session.currentStep || 0) + 1} of your daily rhythm.`
+                ? (session.status === 'completed' 
+                    ? `Day ${session.planDay} is complete. Add mid-day or evening thoughts.`
+                    : `You are on step ${(session.currentStep || 0) + 1} of your daily rhythm.`)
                 : `Enter into silence. Prepare for Day ${dayOverride || currentPlanDay}.`}
             </p>
           </div>
@@ -101,7 +103,7 @@ export default function Home() {
               className="w-full text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl transition-all hover:-translate-y-1"
               onClick={handleStart}
             >
-              {session ? "Resume" : "Start"}
+              {session ? (session.status === 'completed' ? "Journal" : "Resume") : "Start"}
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </Link>

@@ -26,13 +26,34 @@ export function useEremosData() {
     const initData = async () => {
       const planCount = await db.biblePlan.count();
       if (planCount === 0) {
-        // Parse CSVs (simulated here with mock data for robustness)
-        // In production: const res = await fetch('/data/bible_plan.csv'); const text = await res.text();
-        const plan = Papa.parse(SAMPLE_PLAN, { header: true, skipEmptyLines: true }).data;
-        await db.biblePlan.bulkAdd(plan as any);
-        
-        const exam = Papa.parse(SAMPLE_EXAM, { header: true, skipEmptyLines: true }).data;
-        await db.examinationQuestions.bulkAdd(exam as any);
+        try {
+          const res = await fetch('/data/bible_plan.csv');
+          if (res.ok) {
+            const text = await res.text();
+            const plan = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
+            await db.biblePlan.bulkAdd(plan as any);
+          } else {
+            // Fallback if fetch fails
+            const plan = Papa.parse(SAMPLE_PLAN, { header: true, skipEmptyLines: true }).data;
+            await db.biblePlan.bulkAdd(plan as any);
+          }
+          
+          const examRes = await fetch('/data/desert_examination_framework.csv');
+          if (examRes.ok) {
+            const text = await examRes.text();
+            const exam = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
+            await db.examinationQuestions.bulkAdd(exam as any);
+          } else {
+            const exam = Papa.parse(SAMPLE_EXAM, { header: true, skipEmptyLines: true }).data;
+            await db.examinationQuestions.bulkAdd(exam as any);
+          }
+        } catch (err) {
+          console.error("Failed to load CSVs, using samples", err);
+          const plan = Papa.parse(SAMPLE_PLAN, { header: true, skipEmptyLines: true }).data;
+          await db.biblePlan.bulkAdd(plan as any);
+          const exam = Papa.parse(SAMPLE_EXAM, { header: true, skipEmptyLines: true }).data;
+          await db.examinationQuestions.bulkAdd(exam as any);
+        }
       }
       setIsLoading(false);
     };
@@ -88,7 +109,10 @@ export function useCurrentSession() {
 
 // --- Reading Plan ---
 export function useReadingPlan(planDay: number) {
-  return useLiveQuery(() => db.biblePlan.where('day').equals(planDay).first(), [planDay]);
+  const plan = useLiveQuery(() => db.biblePlan.where('day').equals(planDay).first(), [planDay]);
+  
+  // Return a stable object even if loading
+  return plan || null;
 }
 
 // --- Checklist ---
@@ -98,7 +122,7 @@ export function useChecklist(sessionId: number, referencesStr?: string) {
   // Initialize checklist items if they don't exist yet for this session
   useEffect(() => {
     if (referencesStr && items && items.length === 0) {
-      const refs = referencesStr.split(';').map(r => r.trim());
+      const refs = referencesStr.split(/[,;]/).map(r => r.trim()).filter(Boolean);
       const newItems = refs.map(ref => ({
         sessionId,
         reference: ref,
@@ -112,7 +136,7 @@ export function useChecklist(sessionId: number, referencesStr?: string) {
     await db.checklistItems.update(id, { completed });
   };
 
-  return { items, toggleItem };
+  return { items: items || [], toggleItem };
 }
 
 // --- Responses (Autosave) ---

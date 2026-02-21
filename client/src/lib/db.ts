@@ -62,7 +62,7 @@ export class EremosDB extends Dexie {
       biblePlan: '++id, day',
       examinationQuestions: '++id, category',
       sessions: '++id, date, status',
-      responses: '++id, sessionId, stepId',
+      responses: '++id, [sessionId+stepId]',
       checklistItems: '++id, sessionId',
       moodEntries: '++id, sessionId'
     });

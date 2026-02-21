@@ -172,7 +172,13 @@ function ReadingStep({ sessionId, planDay }: { sessionId: number, planDay: numbe
   const plan = useReadingPlan(planDay);
   const { items, toggleItem } = useChecklist(sessionId, plan?.references);
 
-  if (!plan || !items) return <Loader2 className="animate-spin" />;
+  // Show a simpler loader or wait until items are initialized
+  if (!plan) return (
+    <div className="flex flex-col items-center justify-center p-12 space-y-4">
+      <Loader2 className="w-8 h-8 animate-spin text-primary/20" />
+      <p className="text-muted-foreground animate-pulse">Preparing your readings...</p>
+    </div>
+  );
 
   return (
     <div className="space-y-8 animate-in">
@@ -182,21 +188,27 @@ function ReadingStep({ sessionId, planDay }: { sessionId: number, planDay: numbe
       </div>
 
       <div className="grid gap-4">
-        {items.map((item) => (
-          <Card 
-            key={item.id} 
-            className={`
-              p-6 flex items-center gap-4 cursor-pointer transition-all duration-300
-              ${item.completed ? 'bg-secondary border-transparent' : 'bg-card border-border hover:shadow-md'}
-            `}
-            onClick={() => toggleItem(item.id!, !item.completed)}
-          >
-            <Checkbox checked={item.completed} className="w-6 h-6 rounded-full" />
-            <span className={`text-xl font-medium ${item.completed ? 'text-muted-foreground line-through decoration-muted-foreground/50' : 'text-foreground'}`}>
-              {item.reference}
-            </span>
-          </Card>
-        ))}
+        {items.length > 0 ? (
+          items.map((item) => (
+            <Card 
+              key={item.id} 
+              className={`
+                p-6 flex items-center gap-4 cursor-pointer transition-all duration-300
+                ${item.completed ? 'bg-secondary border-transparent' : 'bg-card border-border hover:shadow-md'}
+              `}
+              onClick={() => toggleItem(item.id!, !item.completed)}
+            >
+              <Checkbox checked={item.completed} className="w-6 h-6 rounded-full" />
+              <span className={`text-xl font-medium ${item.completed ? 'text-muted-foreground line-through decoration-muted-foreground/50' : 'text-foreground'}`}>
+                {item.reference}
+              </span>
+            </Card>
+          ))
+        ) : (
+          <div className="p-12 text-center border-2 border-dashed rounded-xl border-primary/10">
+            <p className="text-muted-foreground italic">No readings found for today.</p>
+          </div>
+        )}
       </div>
     </div>
   );

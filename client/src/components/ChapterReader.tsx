@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { fetchChapter, type ChapterData } from "@/lib/bible";
 import { Button } from "@/components/ui/button";
-import { Loader2, BookOpen, Highlighter, Check } from "lucide-react";
+import { Loader2, BookOpen, Highlighter, Check, Trash2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -181,9 +181,24 @@ export function ChapterReader({
 
   const saveHighlight = useCallback(async () => {
     if (!floatingBtn) return;
+    
+    // Check if already highlighted
+    const alreadyHighlighted = filteredHighlights.some(h => 
+      h.verseStart === floatingBtn.verseStart && 
+      h.verseEnd === floatingBtn.verseEnd && 
+      h.highlightText === floatingBtn.text
+    );
+    
+    if (alreadyHighlighted) {
+      setFloatingBtn(null);
+      window.getSelection()?.removeAllRanges();
+      return;
+    }
+
     await apiRequest('POST', `/api/sessions/${sessionId}/highlights`, {
       bookId,
       chapter,
+      bookName, // Added bookName for easier matching in export
       verseStart: floatingBtn.verseStart,
       verseEnd: floatingBtn.verseEnd,
       highlightText: floatingBtn.text,
@@ -191,7 +206,12 @@ export function ChapterReader({
     queryClient.invalidateQueries({ queryKey: ['/api/sessions', String(sessionId), 'highlights'] });
     setFloatingBtn(null);
     window.getSelection()?.removeAllRanges();
-  }, [floatingBtn, sessionId, bookId, chapter]);
+  }, [floatingBtn, sessionId, bookId, chapter, bookName, filteredHighlights]);
+
+  const deleteHighlight = async (id: number) => {
+    await apiRequest('DELETE', `/api/highlights/${id}`);
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions', String(sessionId), 'highlights'] });
+  };
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -327,6 +347,15 @@ export function ChapterReader({
                     {h.verseEnd !== h.verseStart ? `–${h.verseEnd}` : ""}
                   </p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => deleteHighlight(h.id)}
+                  data-testid={`button-delete-highlight-${h.id}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
             ))}
           </CollapsibleContent>

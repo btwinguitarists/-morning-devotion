@@ -41,6 +41,7 @@ export const highlights = pgTable("highlights", {
   id: serial("id").primaryKey(),
   sessionId: integer("session_id").notNull(),
   bookId: varchar("book_id").notNull(),
+  bookName: varchar("book_name").notNull().default(""),
   chapter: integer("chapter").notNull(),
   verseStart: integer("verse_start").notNull(),
   verseEnd: integer("verse_end").notNull(),

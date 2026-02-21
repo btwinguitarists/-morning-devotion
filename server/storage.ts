@@ -44,7 +44,9 @@ export interface IStorage {
   deleteMoodBySession(sessionId: number): Promise<void>;
 
   getHighlightsBySession(sessionId: number): Promise<Highlight[]>;
+  getHighlight(id: number): Promise<Highlight | undefined>;
   createHighlight(data: InsertHighlight): Promise<Highlight>;
+  deleteHighlight(id: number): Promise<void>;
   deleteHighlightsBySession(sessionId: number): Promise<void>;
 }
 
@@ -165,9 +167,18 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(highlights).where(eq(highlights.sessionId, sessionId));
   }
 
+  async getHighlight(id: number): Promise<Highlight | undefined> {
+    const [h] = await db.select().from(highlights).where(eq(highlights.id, id));
+    return h;
+  }
+
   async createHighlight(data: InsertHighlight): Promise<Highlight> {
     const [highlight] = await db.insert(highlights).values(data).returning();
     return highlight;
+  }
+
+  async deleteHighlight(id: number): Promise<void> {
+    await db.delete(highlights).where(eq(highlights.id, id));
   }
 
   async deleteHighlightsBySession(sessionId: number): Promise<void> {

@@ -372,14 +372,16 @@ function HighlightBanner({ sessionId }: { sessionId: number }) {
 
   if (!highlights || highlights.length === 0) return null;
 
-  const latest = highlights[highlights.length - 1];
-
   return (
-    <div className="bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 rounded-lg px-4 py-3 mb-4" data-testid="highlight-banner">
-      <span className="text-xs font-bold tracking-widest uppercase text-amber-700/70 dark:text-amber-400/70">Your Highlight</span>
-      <p className="font-serif text-sm italic text-amber-900/80 dark:text-amber-200/80 mt-1 leading-relaxed">
-        "{latest.highlightText}"
-      </p>
+    <div className="bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 rounded-lg px-4 py-3 mb-4 max-h-32 overflow-y-auto" data-testid="highlight-banner">
+      <span className="text-xs font-bold tracking-widest uppercase text-amber-700/70 dark:text-amber-400/70">Your Highlights</span>
+      <div className="space-y-2 mt-2">
+        {highlights.map((h: any) => (
+          <p key={h.id} className="font-serif text-sm italic text-amber-900/80 dark:text-amber-200/80 leading-relaxed border-l-2 border-amber-200 pl-2">
+            "{h.highlightText}"
+          </p>
+        ))}
+      </div>
     </div>
   );
 }

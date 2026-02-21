@@ -245,6 +245,7 @@ export async function registerRoutes(
       const highlight = await storage.createHighlight({
         sessionId: id,
         bookId: req.body.bookId,
+        bookName: req.body.bookName || "",
         chapter: req.body.chapter,
         verseStart: req.body.verseStart,
         verseEnd: req.body.verseEnd,
@@ -253,6 +254,21 @@ export async function registerRoutes(
       res.json(highlight);
     } catch (e) {
       res.status(500).json({ error: "Failed to save highlight" });
+    }
+  });
+
+  app.delete('/api/highlights/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const highlight = await storage.getHighlight(id);
+      if (!highlight) return res.status(404).json({ error: "Not found" });
+      const session = await storage.getSession(highlight.sessionId);
+      if (!session || session.userId !== userId) return res.status(404).json({ error: "Not found" });
+      await storage.deleteHighlight(id);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete highlight" });
     }
   });
 

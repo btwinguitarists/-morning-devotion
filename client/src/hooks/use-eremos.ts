@@ -223,12 +223,23 @@ export function useResponse(sessionId: number, stepId: string) {
   }, [allResponses, stepId]);
 
   const saveResponse = useCallback(async (text: string, question: string) => {
+    // Optimistically update the cache to prevent typing lag
+    queryClient.setQueryData(['/api/sessions', String(sessionId), 'responses'], (old: any[] | undefined) => {
+      const existing = old || [];
+      const idx = existing.findIndex((r: any) => r.stepId === stepId);
+      if (idx !== -1) {
+        const next = [...existing];
+        next[idx] = { ...next[idx], answerText: text };
+        return next;
+      }
+      return [...existing, { sessionId, stepId, questionTextSnapshot: question, answerText: text }];
+    });
+
     await apiRequest('POST', `/api/sessions/${sessionId}/responses`, {
       stepId,
       questionTextSnapshot: question,
       answerText: text,
     });
-    queryClient.invalidateQueries({ queryKey: ['/api/sessions', String(sessionId), 'responses'] });
   }, [sessionId, stepId]);
 
   return { response, saveResponse };
@@ -315,8 +326,9 @@ export function useMood(sessionId: number) {
   });
 
   const saveMood = useCallback(async (value: number, note: string) => {
+    // Optimistically update the cache to prevent slider lag
+    queryClient.setQueryData(['/api/sessions', String(sessionId), 'mood'], { sessionId, value, note });
     await apiRequest('POST', `/api/sessions/${sessionId}/mood`, { value, note });
-    queryClient.invalidateQueries({ queryKey: ['/api/sessions', String(sessionId), 'mood'] });
   }, [sessionId]);
 
   return { mood: mood ?? undefined, saveMood };
@@ -331,6 +343,10 @@ export async function exportSessionToMarkdown(sessionId: number) {
   const data = await res.json();
   const { session, responses, mood, checklist } = data;
 
+  // Fetch highlights separately
+  const hRes = await fetch(`/api/sessions/${sessionId}/highlights`, { credentials: 'include' });
+  const highlights = hRes.ok ? await hRes.json() : [];
+
   let md = `# ${session.date} - Eremos Session\n\n`;
   md += `**Day:** ${session.planDay}\n`;
   if (mood) {
@@ -339,10 +355,21 @@ export async function exportSessionToMarkdown(sessionId: number) {
   }
   md += `\n---\n\n`;
 
-  md += `## Scripture Readings\n`;
+  md += `## Scripture Readings & Highlights\n`;
   if (checklist && checklist.length > 0) {
     checklist.forEach((item: any) => {
       md += `- [${item.completed ? 'x' : ' '}] ${item.reference}\n`;
+      const itemHighlights = (highlights || []).filter((h: any) => {
+        const parts = item.reference.split(' ');
+        const chapterNum = parseInt(parts[parts.length - 1]);
+        const bookName = parts.slice(0, -1).join(' ');
+        return h.bookName === bookName && h.chapter === chapterNum;
+      });
+      if (itemHighlights.length > 0) {
+        itemHighlights.forEach((h: any) => {
+          md += `  > "${h.highlightText}" (${h.bookId} ${h.chapter}:${h.verseStart}${h.verseEnd !== h.verseStart ? `-${h.verseEnd}` : ''})\n`;
+        });
+      }
     });
   }
   md += `\n`;

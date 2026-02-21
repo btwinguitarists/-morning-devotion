@@ -46,8 +46,13 @@ export default function Wizard() {
     }
   }, [session, stepIndex]);
 
-  // If loading or no session, wait or redirect
-  if (!session || stepIndex === null) {
+  useEffect(() => {
+    if (!user || session === null) {
+      setLocation('/');
+    }
+  }, [user, session, setLocation]);
+
+  if (!session || !user || stepIndex === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

@@ -15,12 +15,12 @@ export default function Journal() {
   const { session } = useCurrentSession(user?.id);
 
   useEffect(() => {
-    if (session === null) {
+    if (!user || session === null) {
       setLocation('/');
     }
-  }, [session, setLocation]);
+  }, [user, session, setLocation]);
 
-  if (!session || session.status !== 'completed') {
+  if (!session || !user || session.status !== 'completed') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

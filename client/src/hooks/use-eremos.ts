@@ -122,6 +122,9 @@ export function useCurrentSession(userId?: string) {
   };
 
   const deleteSession = async (sessionId: number) => {
+    if (!userId) return;
+    const existing = await db.sessions.get(sessionId);
+    if (!existing || existing.userId !== userId) return;
     await db.responses.where('sessionId').equals(sessionId).delete();
     await db.checklistItems.where('sessionId').equals(sessionId).delete();
     await db.moodEntries.where('sessionId').equals(sessionId).delete();
@@ -129,8 +132,9 @@ export function useCurrentSession(userId?: string) {
   };
 
   const restartSession = async (sessionId: number) => {
+    if (!userId) return;
     const existing = await db.sessions.get(sessionId);
-    if (!existing) return;
+    if (!existing || existing.userId !== userId) return;
     await db.responses.where('sessionId').equals(sessionId).delete();
     await db.checklistItems.where('sessionId').equals(sessionId).delete();
     await db.moodEntries.where('sessionId').equals(sessionId).delete();

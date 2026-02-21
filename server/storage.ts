@@ -107,7 +107,7 @@ export class DatabaseStorage implements IStorage {
       await db.update(prayerResponses)
         .set({ answerText: data.answerText, questionTextSnapshot: data.questionTextSnapshot, updatedAt: new Date() })
         .where(eq(prayerResponses.id, existing.id));
-      return { ...existing, answerText: data.answerText, questionTextSnapshot: data.questionTextSnapshot };
+      return { ...existing, answerText: data.answerText || "", questionTextSnapshot: data.questionTextSnapshot || "" };
     }
     const [resp] = await db.insert(prayerResponses).values(data).returning();
     return resp;
@@ -140,7 +140,7 @@ export class DatabaseStorage implements IStorage {
     const existing = await this.getMoodBySession(data.sessionId);
     if (existing) {
       await db.update(moodEntries).set({ value: data.value, note: data.note }).where(eq(moodEntries.id, existing.id));
-      return { ...existing, value: data.value, note: data.note };
+      return { ...existing, value: data.value, note: data.note || "" };
     }
     const [mood] = await db.insert(moodEntries).values(data).returning();
     return mood;

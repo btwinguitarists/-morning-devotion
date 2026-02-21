@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useQuery } from "@tanstack/react-query";
 import { 
   useCurrentSession, 
+  useEremosData,
   useReadingPlan, 
   useChecklist, 
   useResponse, 
@@ -20,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { exportSessionToMarkdown } from "@/hooks/use-eremos";
 import { parseAllReferences, type ChapterRef } from "@/lib/bible";
 import { getBenedictionForDay } from "@/lib/benedictions";
-import { db } from "@/lib/db";
 
 const STEPS = [
   { id: 'prayer-open', title: 'Morning Consecration' },
@@ -40,6 +40,7 @@ export default function Wizard() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { session, updateStep, completeSession } = useCurrentSession(user?.id);
+  const { biblePlan, examQuestions } = useEremosData();
   const [stepIndex, setStepIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -98,21 +99,23 @@ export default function Wizard() {
       <StepContent 
         stepId={currentStepDef.id} 
         sessionId={session.id!} 
-        planDay={session.planDay} 
+        planDay={session.planDay}
+        biblePlan={biblePlan}
+        examQuestions={examQuestions}
       />
     </WizardLayout>
   );
 }
 
-function StepContent({ stepId, sessionId, planDay }: { stepId: string, sessionId: number, planDay: number }) {
-  const prompts = usePrompts(planDay);
+function StepContent({ stepId, sessionId, planDay, biblePlan, examQuestions }: { stepId: string, sessionId: number, planDay: number, biblePlan: any[], examQuestions: any[] }) {
+  const prompts = usePrompts(planDay, examQuestions);
 
   switch (stepId) {
     case 'prayer-open':
       return <MorningPrayer />;
 
     case 'reading':
-      return <ReadingStep sessionId={sessionId} planDay={planDay} />;
+      return <ReadingStep sessionId={sessionId} planDay={planDay} biblePlan={biblePlan} />;
 
     case 'meditation-1':
       return <MeditationStep sessionId={sessionId} stepId={stepId} question={prompts.meditation[0].question} label="Revelation" />;
@@ -244,8 +247,8 @@ function ClosingPrayer({ sessionId, planDay }: { sessionId: number, planDay: num
   );
 }
 
-function ReadingStep({ sessionId, planDay }: { sessionId: number, planDay: number }) {
-  const plan = useReadingPlan(planDay);
+function ReadingStep({ sessionId, planDay, biblePlan }: { sessionId: number, planDay: number, biblePlan: any[] }) {
+  const plan = useReadingPlan(planDay, biblePlan);
   const { items, toggleItem } = useChecklist(sessionId, plan?.references);
   const [activeChapterIndex, setActiveChapterIndex] = useState(0);
 
@@ -358,11 +361,10 @@ function ReadingStep({ sessionId, planDay }: { sessionId: number, planDay: numbe
 }
 
 function HighlightBanner({ sessionId }: { sessionId: number }) {
-  const highlights = useLiveQuery(
-    () => db.highlights.where('sessionId').equals(sessionId).toArray(),
-    [sessionId],
-    []
-  );
+  const { data: highlights } = useQuery<any[]>({
+    queryKey: ['/api/sessions', String(sessionId), 'highlights'],
+    enabled: !!sessionId,
+  });
 
   if (!highlights || highlights.length === 0) return null;
 
@@ -372,7 +374,7 @@ function HighlightBanner({ sessionId }: { sessionId: number }) {
     <div className="bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 rounded-lg px-4 py-3 mb-4" data-testid="highlight-banner">
       <span className="text-xs font-bold tracking-widest uppercase text-amber-700/70 dark:text-amber-400/70">Your Highlight</span>
       <p className="font-serif text-sm italic text-amber-900/80 dark:text-amber-200/80 mt-1 leading-relaxed">
-        "{latest.text}"
+        "{latest.highlightText}"
       </p>
     </div>
   );

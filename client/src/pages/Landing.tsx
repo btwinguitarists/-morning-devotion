@@ -69,8 +69,18 @@ export default function Landing() {
         </div>
       </div>
 
-      <footer className="p-6 text-center text-xs text-muted-foreground border-t border-border/30">
-        A solitary place for daily prayer and reflection.
+      <footer className="p-6 text-center space-y-3 border-t border-border/30">
+        <p className="text-xs text-muted-foreground">A solitary place for daily prayer and reflection.</p>
+        <a 
+          href="https://paypal.me/placeholder" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 hover:text-primary transition-colors"
+          data-testid="link-donate"
+        >
+          <Heart className="w-3 h-3" />
+          Support this ministry
+        </a>
       </footer>
     </div>
   );

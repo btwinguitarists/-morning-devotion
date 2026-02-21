@@ -1,258 +1,273 @@
-import { useLiveQuery } from "dexie-react-hooks";
-import { db, type Session, type Response, type ChecklistItem } from "@/lib/db";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import Papa from "papaparse";
 import { format } from "date-fns";
 import { parseAllReferences } from "@/lib/bible";
 
-// --- Seed Data Helper ---
-// In a real app, this would load from CSVs in /public/data
-// For this generation, we'll embed some sample data to ensure it works immediately
-const SAMPLE_PLAN = `day,references
-1,Genesis 1-3; Psalm 1
-2,Genesis 4-7; Psalm 2
-3,Genesis 8-11; Psalm 3`;
+interface BiblePlanEntry {
+  day: number;
+  references: string;
+}
 
-const SAMPLE_EXAM = `category,question
-Logismoi,What thoughts have I been entertaining today?
-Humility,Where have I sought to be noticed?
-Prayer,Has my prayer been distracted or attentive?
-Speech,Have I spoken words that were better left unsaid?`;
+interface ExaminationQuestion {
+  category: string;
+  question: string;
+}
 
 export function useEremosData() {
   const [isLoading, setIsLoading] = useState(true);
+  const [biblePlan, setBiblePlan] = useState<BiblePlanEntry[]>([]);
+  const [examQuestions, setExamQuestions] = useState<ExaminationQuestion[]>([]);
 
-  // Initialize DB with CSV data if empty
   useEffect(() => {
-    const initData = async () => {
-      const planCount = await db.biblePlan.count();
-      if (planCount === 0) {
-        try {
-          const res = await fetch('/data/bible_plan.csv');
-          if (res.ok) {
-            const text = await res.text();
-            // Using a more robust parser configuration for Bible plan
-            const plan = Papa.parse(text, { 
-              header: true, 
-              skipEmptyLines: true,
-              transformHeader: (h) => h.trim() 
-            }).data.map((row: any) => ({
-              day: parseInt(row.Day),
-              references: [
-                row['Torah / History'],
-                row['Wisdom'],
-                row['Prophets'],
-                row['New Testament']
-              ].filter(Boolean).join('; ')
-            }));
-            await db.biblePlan.bulkAdd(plan as any);
-          }
-          
-          const examRes = await fetch('/data/desert_examination_framework.csv');
-          if (examRes.ok) {
-            const text = await examRes.text();
-            const lines = text.split('\n').filter(l => l.trim());
-            const headers = lines[0].split(',').map(h => h.trim().replace(/ \(.+\)/, ''));
-            const categoryQuestions: any[] = [];
-            
-            // Start from line 1 (first row of questions)
-            for (let i = 1; i < lines.length; i++) {
-              const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // Split by comma but respect quotes
-              row.forEach((q, colIndex) => {
-                if (q && headers[colIndex]) {
-                  categoryQuestions.push({
-                    category: headers[colIndex],
-                    question: q.replace(/^"|"$/g, '').trim()
-                  });
-                }
-              });
-            }
-            await db.examinationQuestions.bulkAdd(categoryQuestions);
-          }
-        } catch (err) {
-          console.error("Failed to load CSVs", err);
+    const loadData = async () => {
+      try {
+        const [planRes, examRes] = await Promise.all([
+          fetch('/data/bible_plan.csv'),
+          fetch('/data/desert_examination_framework.csv'),
+        ]);
+
+        if (planRes.ok) {
+          const text = await planRes.text();
+          const plan = Papa.parse(text, {
+            header: true,
+            skipEmptyLines: true,
+            transformHeader: (h) => h.trim(),
+          }).data.map((row: any) => ({
+            day: parseInt(row.Day),
+            references: [
+              row['Torah / History'],
+              row['Wisdom'],
+              row['Prophets'],
+              row['New Testament'],
+            ].filter(Boolean).join('; '),
+          }));
+          setBiblePlan(plan as BiblePlanEntry[]);
         }
+
+        if (examRes.ok) {
+          const text = await examRes.text();
+          const lines = text.split('\n').filter((l) => l.trim());
+          const headers = lines[0].split(',').map((h) => h.trim().replace(/ \(.+\)/, ''));
+          const categoryQuestions: ExaminationQuestion[] = [];
+
+          for (let i = 1; i < lines.length; i++) {
+            const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            row.forEach((q, colIndex) => {
+              if (q && headers[colIndex]) {
+                categoryQuestions.push({
+                  category: headers[colIndex],
+                  question: q.replace(/^"|"$/g, '').trim(),
+                });
+              }
+            });
+          }
+          setExamQuestions(categoryQuestions);
+        }
+      } catch (err) {
+        console.error("Failed to load CSVs", err);
       }
       setIsLoading(false);
     };
-    initData();
+    loadData();
   }, []);
 
-  return { isLoading };
+  return { isLoading, biblePlan, examQuestions };
 }
 
-// --- Session Management ---
 export function useCurrentSession(userId?: string) {
   const today = format(new Date(), 'yyyy-MM-dd');
-  
-  const session = useLiveQuery(async () => {
-    if (!userId) return undefined;
-    const todaySession = await db.sessions.where({ userId, date: today }).first();
-    if (todaySession) return todaySession;
-    return await db.sessions.where({ userId, status: 'in-progress' }).last();
-  }, [userId, today]);
 
-  const startNewSession = async (dayOverride?: number) => {
+  const { data: session, isLoading } = useQuery<any>({
+    queryKey: ['/api/sessions/current', today],
+    queryFn: async () => {
+      const res = await fetch(`/api/sessions/current?date=${today}`, { credentials: 'include' });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error('Failed to fetch session');
+      return res.json();
+    },
+    enabled: !!userId,
+  });
+
+  const startNewSession = useCallback(async (dayOverride?: number) => {
     if (!userId) return;
+
     let nextDay = dayOverride;
     if (nextDay === undefined) {
-      const lastCompleted = await db.sessions.where({ userId, status: 'completed' }).last();
-      nextDay = (lastCompleted?.planDay || 0) + 1;
+      try {
+        const res = await fetch('/api/sessions/last-completed', { credentials: 'include' });
+        if (res.ok) {
+          const last = await res.json();
+          nextDay = (last?.planDay || 0) + 1;
+        } else {
+          nextDay = 1;
+        }
+      } catch {
+        nextDay = 1;
+      }
     }
 
-    const id = await db.sessions.add({
-      userId,
+    const res = await apiRequest('POST', '/api/sessions', {
       date: today,
       planDay: nextDay,
-      status: 'in-progress',
-      startedAt: Date.now(),
-      currentStep: 0
+      currentStep: 0,
     });
-    return id;
-  };
+    const newSession = await res.json();
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] });
+    return newSession.id;
+  }, [userId, today]);
 
-  const updateStep = async (sessionId: number, step: number) => {
-    await db.sessions.update(sessionId, { currentStep: step });
-  };
+  const updateStep = useCallback(async (sessionId: number, step: number) => {
+    await apiRequest('PATCH', `/api/sessions/${sessionId}`, { currentStep: step });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] });
+  }, []);
 
-  const completeSession = async (sessionId: number) => {
-    await db.sessions.update(sessionId, { 
-      status: 'completed',
-      completedAt: Date.now()
-    });
-  };
+  const completeSession = useCallback(async (sessionId: number) => {
+    await apiRequest('PATCH', `/api/sessions/${sessionId}`, { status: 'completed' });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] });
+  }, []);
 
-  const deleteSession = async (sessionId: number) => {
+  const deleteSession = useCallback(async (sessionId: number) => {
     if (!userId) return;
-    const existing = await db.sessions.get(sessionId);
-    if (!existing || existing.userId !== userId) return;
-    await db.responses.where('sessionId').equals(sessionId).delete();
-    await db.checklistItems.where('sessionId').equals(sessionId).delete();
-    await db.moodEntries.where('sessionId').equals(sessionId).delete();
-    await db.sessions.delete(sessionId);
-  };
+    await apiRequest('DELETE', `/api/sessions/${sessionId}`);
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] });
+  }, [userId]);
 
-  const restartSession = async (sessionId: number) => {
+  const restartSession = useCallback(async (sessionId: number) => {
     if (!userId) return;
-    const existing = await db.sessions.get(sessionId);
-    if (!existing || existing.userId !== userId) return;
-    await db.responses.where('sessionId').equals(sessionId).delete();
-    await db.checklistItems.where('sessionId').equals(sessionId).delete();
-    await db.moodEntries.where('sessionId').equals(sessionId).delete();
-    await db.sessions.update(sessionId, { 
-      status: 'in-progress' as const, 
-      currentStep: 0, 
-      completedAt: undefined 
-    });
-  };
+    await apiRequest('POST', `/api/sessions/${sessionId}/restart`);
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions/current'] });
+  }, [userId]);
 
-  return { session, startNewSession, updateStep, completeSession, deleteSession, restartSession };
+  return {
+    session: isLoading ? undefined : (session ?? null),
+    startNewSession,
+    updateStep,
+    completeSession,
+    deleteSession,
+    restartSession,
+  };
 }
 
-// --- Reading Plan ---
-export function useReadingPlan(planDay: number) {
-  const plan = useLiveQuery(() => db.biblePlan.where('day').equals(planDay).first(), [planDay]);
-  
-  // Return a stable object even if loading
-  return plan || null;
+export function useReadingPlan(planDay: number, biblePlan?: BiblePlanEntry[]) {
+  return useMemo(() => {
+    if (!biblePlan || biblePlan.length === 0) return null;
+    return biblePlan.find((p) => p.day === planDay) || null;
+  }, [planDay, biblePlan]);
 }
 
-// --- Checklist ---
 export function useChecklist(sessionId: number, referencesStr?: string) {
-  const items = useLiveQuery(() => db.checklistItems.where('sessionId').equals(sessionId).toArray(), [sessionId]);
+  const { data: items } = useQuery<any[]>({
+    queryKey: ['/api/sessions', String(sessionId), 'checklist'],
+    enabled: !!sessionId,
+  });
+
+  const creatingRef = useRef(false);
 
   useEffect(() => {
-    if (referencesStr && items && items.length === 0) {
+    if (
+      referencesStr &&
+      items &&
+      items.length === 0 &&
+      !creatingRef.current
+    ) {
+      creatingRef.current = true;
       const chapters = parseAllReferences(referencesStr);
+      let newItems: { reference: string; completed: boolean }[];
+
       if (chapters.length > 0) {
-        const newItems = chapters.map((ch: any) => ({
-          sessionId,
+        newItems = chapters.map((ch: any) => ({
           reference: ch.label,
-          completed: false
+          completed: false,
         }));
-        db.checklistItems.bulkAdd(newItems);
       } else {
         const refs = referencesStr.split(/[,;]/).map((r: string) => r.trim()).filter(Boolean);
-        const newItems = refs.map((ref: string) => ({
-          sessionId,
+        newItems = refs.map((ref: string) => ({
           reference: ref,
-          completed: false
+          completed: false,
         }));
-        db.checklistItems.bulkAdd(newItems);
       }
+
+      apiRequest('POST', `/api/sessions/${sessionId}/checklist`, { items: newItems })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/sessions', String(sessionId), 'checklist'] });
+        })
+        .finally(() => {
+          creatingRef.current = false;
+        });
     }
   }, [sessionId, referencesStr, items]);
 
-  const toggleItem = async (id: number, completed: boolean) => {
-    await db.checklistItems.update(id, { completed });
-  };
+  const toggleItem = useCallback(async (id: number, completed: boolean) => {
+    await apiRequest('PATCH', `/api/checklist/${id}`, { completed });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions', String(sessionId), 'checklist'] });
+  }, [sessionId]);
 
   return { items: items || [], toggleItem };
 }
 
-// --- Responses (Autosave) ---
 export function useResponse(sessionId: number, stepId: string) {
-  const response = useLiveQuery(
-    () => db.responses.where({ sessionId, stepId }).first(),
-    [sessionId, stepId]
-  );
+  const { data: allResponses } = useQuery<any[]>({
+    queryKey: ['/api/sessions', String(sessionId), 'responses'],
+    enabled: !!sessionId,
+  });
+
+  const response = useMemo(() => {
+    if (!allResponses) return undefined;
+    return allResponses.find((r: any) => r.stepId === stepId);
+  }, [allResponses, stepId]);
 
   const saveResponse = useCallback(async (text: string, question: string) => {
-    const existing = await db.responses.where({ sessionId, stepId }).first();
-    if (existing) {
-      await db.responses.update(existing.id!, { 
-        answerText: text,
-        updatedAt: Date.now() 
-      });
-    } else {
-      await db.responses.add({
-        sessionId,
-        stepId,
-        questionTextSnapshot: question,
-        answerText: text,
-        updatedAt: Date.now()
-      });
-    }
+    await apiRequest('POST', `/api/sessions/${sessionId}/responses`, {
+      stepId,
+      questionTextSnapshot: question,
+      answerText: text,
+    });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions', String(sessionId), 'responses'] });
   }, [sessionId, stepId]);
 
   return { response, saveResponse };
 }
 
-// --- Prompts Logic ---
-export function usePrompts(planDay: number) {
+export function usePrompts(planDay: number, examQuestions?: ExaminationQuestion[]) {
   const weekIndex = Math.floor((planDay - 1) / 7);
   const processIndex = (planDay - 1) % 7;
-  
+
   const categoryNames = [
-    "Logismoi", "Humility", "Prayer Examination", 
-    "Speech", "Detachment", "Acedia", "Daily Rhythm"
+    "Logismoi", "Humility", "Prayer Examination",
+    "Detachment", "Speech", "Acedia", "Daily Rhythm",
   ];
   const currentCategory = categoryNames[processIndex];
 
-  const examQuestions = useLiveQuery(
-    () => db.examinationQuestions.where('category').startsWith(currentCategory).toArray(),
-    [currentCategory]
-  );
+  const filteredExam = useMemo(() => {
+    if (!examQuestions) return [];
+    return examQuestions.filter((q) => q.category.startsWith(currentCategory));
+  }, [examQuestions, currentCategory]);
 
   const meditationPools = [
     [
       "What does this reveal about God's character?",
       "What does this show about how God acts?",
       "What aspect of God do I resist here?",
-      "What would change if I believed this about God?"
+      "What would change if I believed this about God?",
     ],
     [
       "What does this expose in me?",
       "Where do I resist this truth?",
       "What part of me is unsettled by this passage?",
-      "What fear in me does this address?"
+      "What fear in me does this address?",
     ],
     [
       "What must be surrendered?",
       "What obedience is implied here?",
       "What would trust look like in response?",
-      "Where is repentance needed?"
-    ]
+      "Where is repentance needed?",
+    ],
   ];
 
   const getMeditationPrompt = (poolIndex: number) => {
@@ -265,37 +280,40 @@ export function usePrompts(planDay: number) {
     meditation: [
       { id: 'med-1', question: getMeditationPrompt(0), type: 'Revelation' },
       { id: 'med-2', question: getMeditationPrompt(1), type: 'Exposure' },
-      { id: 'med-3', question: getMeditationPrompt(2), type: 'Response' }
+      { id: 'med-3', question: getMeditationPrompt(2), type: 'Response' },
     ],
-    examination: examQuestions || []
+    examination: filteredExam,
   };
 }
 
-// --- Mood ---
 export function useMood(sessionId: number) {
-  const mood = useLiveQuery(() => db.moodEntries.where('sessionId').equals(sessionId).first(), [sessionId]);
+  const { data: mood } = useQuery<any>({
+    queryKey: ['/api/sessions', String(sessionId), 'mood'],
+    queryFn: async () => {
+      const res = await fetch(`/api/sessions/${sessionId}/mood`, { credentials: 'include' });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error('Failed to fetch mood');
+      return res.json();
+    },
+    enabled: !!sessionId,
+  });
 
-  const saveMood = async (value: number, note: string) => {
-    const existing = await db.moodEntries.where('sessionId').equals(sessionId).first();
-    if (existing) {
-      await db.moodEntries.update(existing.id!, { value, note });
-    } else {
-      await db.moodEntries.add({ sessionId, value, note });
-    }
-  };
+  const saveMood = useCallback(async (value: number, note: string) => {
+    await apiRequest('POST', `/api/sessions/${sessionId}/mood`, { value, note });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions', String(sessionId), 'mood'] });
+  }, [sessionId]);
 
-  return { mood, saveMood };
+  return { mood: mood ?? undefined, saveMood };
 }
 
-// --- Export Helper ---
 export async function exportSessionToMarkdown(sessionId: number) {
-  const session = await db.sessions.get(sessionId);
-  if (!session) return;
-
-  const responses = await db.responses.where('sessionId').equals(sessionId).toArray();
-  const mood = await db.moodEntries.where('sessionId').equals(sessionId).first();
-  const checklist = await db.checklistItems.where('sessionId').equals(sessionId).toArray();
-  const plan = await db.biblePlan.where('day').equals(session.planDay).first();
+  const res = await fetch(`/api/sessions/${sessionId}/export`, { credentials: 'include' });
+  if (!res.ok) {
+    console.error("Failed to export session");
+    return;
+  }
+  const data = await res.json();
+  const { session, responses, mood, checklist } = data;
 
   let md = `# ${session.date} - Eremos Session\n\n`;
   md += `**Day:** ${session.planDay}\n`;
@@ -306,14 +324,8 @@ export async function exportSessionToMarkdown(sessionId: number) {
   md += `\n---\n\n`;
 
   md += `## Scripture Readings\n`;
-  if (plan && plan.references) {
-    const refs = plan.references.split(/[,;]/).map(r => r.trim()).filter(Boolean);
-    refs.forEach(ref => {
-      const isCompleted = checklist.find(c => c.reference === ref)?.completed;
-      md += `- [${isCompleted ? 'x' : ' '}] ${ref}\n`;
-    });
-  } else {
-    checklist.forEach(item => {
+  if (checklist && checklist.length > 0) {
+    checklist.forEach((item: any) => {
       md += `- [${item.completed ? 'x' : ' '}] ${item.reference}\n`;
     });
   }
@@ -323,7 +335,7 @@ export async function exportSessionToMarkdown(sessionId: number) {
     'meditation-1', 'meditation-2', 'meditation-3',
     'examination-1', 'examination-2', 'examination-3',
     'prayer-free',
-    'journal-midday', 'journal-evening'
+    'journal-midday', 'journal-evening',
   ];
 
   const labels: Record<string, string> = {
@@ -335,21 +347,22 @@ export async function exportSessionToMarkdown(sessionId: number) {
     'examination-3': 'Examination III',
     'prayer-free': 'Free Prayer',
     'journal-midday': 'Mid-Day Reflections',
-    'journal-evening': 'Evening Reflections'
+    'journal-evening': 'Evening Reflections',
   };
 
-  stepOrder.forEach(stepId => {
-    const resp = responses.find(r => r.stepId === stepId);
-    if (resp && resp.answerText) {
-      md += `### ${labels[stepId] || stepId}\n`;
-      md += `*${resp.questionTextSnapshot}*\n\n`;
-      md += `${resp.answerText}\n\n`;
-    }
-  });
+  if (responses) {
+    stepOrder.forEach((stepId) => {
+      const resp = responses.find((r: any) => r.stepId === stepId);
+      if (resp && resp.answerText) {
+        md += `### ${labels[stepId] || stepId}\n`;
+        md += `*${resp.questionTextSnapshot}*\n\n`;
+        md += `${resp.answerText}\n\n`;
+      }
+    });
+  }
 
   md += `\n---\n*Amen.*`;
 
-  // Download logic
   const blob = new Blob([md], { type: 'text/markdown' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

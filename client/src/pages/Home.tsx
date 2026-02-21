@@ -3,10 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCurrentSession, useEremosData, exportSessionToMarkdown } from "@/hooks/use-eremos";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, ArrowRight, BookOpen, Clock, Calendar, History, Download, Settings2, Trash2, RotateCcw, PenLine, LogOut } from "lucide-react";
 import { format } from "date-fns";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/lib/db";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -19,12 +18,15 @@ export default function Home() {
   const { session, startNewSession, deleteSession, restartSession } = useCurrentSession(userId);
   const [dayOverride, setDayOverride] = useState<string>("");
 
-  const history = useLiveQuery(
-    () => userId 
-      ? db.sessions.where({ userId, status: 'completed' }).reverse().limit(5).toArray()
-      : [],
-    [userId]
-  );
+  const { data: allSessions } = useQuery<any[]>({
+    queryKey: ['/api/sessions'],
+    enabled: !!userId,
+  });
+
+  const history = (allSessions || [])
+    .filter((s: any) => s.status === 'completed')
+    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
 
   const handleStart = async () => {
     if (!session) {
@@ -42,14 +44,13 @@ export default function Home() {
   }
 
   const today = format(new Date(), "EEEE, MMMM do");
-  const currentPlanDay = session?.planDay || (history?.[0]?.planDay ? history[0].planDay + 1 : 1);
+  const currentPlanDay = session?.planDay || (history.length > 0 ? history[0].planDay + 1 : 1);
   const isCompleted = session?.status === 'completed';
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 py-12">
       <div className="max-w-md w-full space-y-12">
         
-        {/* User Bar */}
         {user && (
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -74,7 +75,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Header */}
         <div className="text-center space-y-4">
           <h1 className="text-5xl font-serif tracking-tight text-primary" data-testid="text-app-title">Eremos</h1>
           <p className="text-muted-foreground font-serif italic text-lg">
@@ -83,15 +83,12 @@ export default function Home() {
           <p className="text-xs text-muted-foreground/50 tracking-wide uppercase">Psalm 46:10</p>
         </div>
 
-        {/* Date Display */}
         <div className="flex items-center justify-center gap-2 text-sm font-medium uppercase tracking-widest text-muted-foreground">
           <Calendar className="w-4 h-4" />
           {today}
         </div>
 
-        {/* Main Action Card */}
         <Card className="p-8 border-border shadow-2xl shadow-black/5 flex flex-col gap-6 items-center text-center hover:border-primary/20 transition-all duration-500 relative">
-          {/* Settings gear - only show when no session exists */}
           {!session && (
             <div className="absolute top-4 right-4">
               <Popover>
@@ -135,7 +132,6 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Primary action */}
           <Link href={isCompleted ? "/journal" : "/wizard"}>
             <Button 
               size="lg" 
@@ -149,7 +145,6 @@ export default function Home() {
             </Button>
           </Link>
 
-          {/* Session management controls */}
           {session && (
             <div className="flex gap-3 pt-2 border-t border-border/50 w-full justify-center">
               <AlertDialog>
@@ -205,15 +200,14 @@ export default function Home() {
           )}
         </Card>
 
-        {/* History Section */}
-        {history && history.length > 0 && (
+        {history.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground px-2">
               <History className="w-3 h-3" />
               Recent History
             </div>
             <div className="grid gap-2">
-              {history.map((s) => (
+              {history.map((s: any) => (
                 <div key={s.id} className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 border border-transparent hover:border-primary/10 transition-colors group">
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">{format(new Date(s.date), "MMM d, yyyy")}</span>
@@ -234,7 +228,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Stats / Footer */}
         <div className="grid grid-cols-2 gap-4">
           <div className="p-4 rounded-xl bg-secondary/50 flex flex-col items-center gap-2 text-center">
             <BookOpen className="w-5 h-5 text-muted-foreground" />

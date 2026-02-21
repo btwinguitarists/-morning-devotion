@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { fetchChapter, type ChapterData } from "@/lib/bible";
-import { db } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Loader2, BookOpen, Highlighter, Check } from "lucide-react";
 import {
@@ -58,22 +58,19 @@ export function ChapterReader({
     };
   }, [bookId, chapter]);
 
-  const highlights = useLiveQuery(
-    () =>
-      db.highlights
-        .where("[sessionId+bookId+chapter]")
-        .equals([sessionId, bookId, chapter])
-        .toArray(),
-    [sessionId, bookId, chapter],
-    []
+  const { data: highlights } = useQuery<any[]>({
+    queryKey: ['/api/sessions', String(sessionId), 'highlights'],
+    enabled: !!sessionId,
+  });
+
+  const filteredHighlights = (highlights || []).filter(
+    (h: any) => h.bookId === bookId && h.chapter === chapter
   );
 
   const highlightedVerses = new Set<number>();
-  if (highlights) {
-    for (const h of highlights) {
-      for (let v = h.verseStart; v <= h.verseEnd; v++) {
-        highlightedVerses.add(v);
-      }
+  for (const h of filteredHighlights) {
+    for (let v = h.verseStart; v <= h.verseEnd; v++) {
+      highlightedVerses.add(v);
     }
   }
 
@@ -128,22 +125,17 @@ export function ChapterReader({
 
   const saveHighlight = useCallback(async () => {
     if (!floatingBtn) return;
-    await db.highlights.add({
-      sessionId,
+    await apiRequest('POST', `/api/sessions/${sessionId}/highlights`, {
       bookId,
       chapter,
       verseStart: floatingBtn.verseStart,
       verseEnd: floatingBtn.verseEnd,
-      text: floatingBtn.text,
-      createdAt: Date.now(),
+      highlightText: floatingBtn.text,
     });
+    queryClient.invalidateQueries({ queryKey: ['/api/sessions', String(sessionId), 'highlights'] });
     setFloatingBtn(null);
     window.getSelection()?.removeAllRanges();
   }, [floatingBtn, sessionId, bookId, chapter]);
-
-  const deleteHighlight = useCallback(async (id: number) => {
-    await db.highlights.delete(id);
-  }, []);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -251,7 +243,7 @@ export function ChapterReader({
         </p>
       </div>
 
-      {highlights && highlights.length > 0 && (
+      {filteredHighlights.length > 0 && (
         <Collapsible
           open={highlightsOpen}
           onOpenChange={setHighlightsOpen}
@@ -265,11 +257,11 @@ export function ChapterReader({
               data-testid="button-toggle-highlights"
             >
               <Highlighter className="h-3.5 w-3.5" />
-              {highlights.length} highlight{highlights.length !== 1 ? "s" : ""}
+              {filteredHighlights.length} highlight{filteredHighlights.length !== 1 ? "s" : ""}
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-2">
-            {highlights.map((h) => (
+            {filteredHighlights.map((h: any) => (
               <div
                 key={h.id}
                 className="flex items-start gap-2 group"
@@ -277,22 +269,13 @@ export function ChapterReader({
               >
                 <div className="flex-1 bg-amber-100/60 dark:bg-amber-900/30 rounded-md px-3 py-2">
                   <p className="text-sm font-serif italic text-foreground/80">
-                    "{h.text}"
+                    "{h.highlightText}"
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     vv. {h.verseStart}
                     {h.verseEnd !== h.verseStart ? `–${h.verseEnd}` : ""}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="invisible group-hover:visible shrink-0 text-muted-foreground"
-                  onClick={() => h.id && deleteHighlight(h.id)}
-                  data-testid={`button-delete-highlight-${h.id}`}
-                >
-                  <span className="text-xs">x</span>
-                </Button>
               </div>
             ))}
           </CollapsibleContent>

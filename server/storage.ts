@@ -34,8 +34,10 @@ export interface IStorage {
 
   getChecklistBySession(sessionId: number): Promise<ChecklistItem[]>;
   bulkCreateChecklist(items: InsertChecklistItem[]): Promise<void>;
+  getChecklistItem(id: number): Promise<ChecklistItem | undefined>;
   toggleChecklistItem(id: number, completed: boolean): Promise<void>;
   deleteChecklistBySession(sessionId: number): Promise<void>;
+  deleteResponsesBySession(sessionId: number): Promise<void>;
 
   getMoodBySession(sessionId: number): Promise<MoodEntry | undefined>;
   upsertMood(data: InsertMoodEntry): Promise<MoodEntry>;
@@ -123,8 +125,17 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getChecklistItem(id: number): Promise<ChecklistItem | undefined> {
+    const [item] = await db.select().from(checklistItems).where(eq(checklistItems.id, id));
+    return item;
+  }
+
   async toggleChecklistItem(id: number, completed: boolean): Promise<void> {
     await db.update(checklistItems).set({ completed }).where(eq(checklistItems.id, id));
+  }
+
+  async deleteResponsesBySession(sessionId: number): Promise<void> {
+    await db.delete(prayerResponses).where(eq(prayerResponses.sessionId, sessionId));
   }
 
   async deleteChecklistBySession(sessionId: number): Promise<void> {

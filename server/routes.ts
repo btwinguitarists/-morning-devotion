@@ -110,7 +110,7 @@ export async function registerRoutes(
       await storage.deleteChecklistBySession(id);
       await storage.deleteMoodBySession(id);
       await storage.deleteHighlightsBySession(id);
-      await db_deleteResponsesBySession(id);
+      await storage.deleteResponsesBySession(id);
       await storage.updateSession(id, { status: "in-progress", currentStep: 0, completedAt: null });
       const updated = await storage.getSession(id);
       res.json(updated);
@@ -180,7 +180,13 @@ export async function registerRoutes(
 
   app.patch('/api/checklist/:id', isAuthenticated, async (req: any, res) => {
     try {
-      await storage.toggleChecklistItem(parseInt(req.params.id), req.body.completed);
+      const userId = req.user.claims.sub;
+      const itemId = parseInt(req.params.id);
+      const item = await storage.getChecklistItem(itemId);
+      if (!item) return res.status(404).json({ error: "Not found" });
+      const session = await storage.getSession(item.sessionId);
+      if (!session || session.userId !== userId) return res.status(404).json({ error: "Not found" });
+      await storage.toggleChecklistItem(itemId, req.body.completed);
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to toggle checklist" });
@@ -266,11 +272,4 @@ export async function registerRoutes(
   });
 
   return httpServer;
-}
-
-async function db_deleteResponsesBySession(sessionId: number) {
-  const { db } = await import("./db");
-  const { prayerResponses } = await import("@shared/schema");
-  const { eq } = await import("drizzle-orm");
-  await db.delete(prayerResponses).where(eq(prayerResponses.sessionId, sessionId));
 }

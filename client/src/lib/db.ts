@@ -1,10 +1,9 @@
 import Dexie, { type Table } from 'dexie';
 
-// --- Types ---
 export interface BiblePlanEntry {
   id?: number;
   day: number;
-  references: string; // e.g., "Gen 1-3, Psalm 1"
+  references: string;
   category?: string;
 }
 
@@ -16,18 +15,19 @@ export interface ExaminationQuestion {
 
 export interface Session {
   id?: number;
-  date: string; // ISO date string YYYY-MM-DD
+  userId: string;
+  date: string;
   planDay: number;
   status: 'in-progress' | 'completed';
-  startedAt: number; // timestamp
-  completedAt?: number; // timestamp
+  startedAt: number;
+  completedAt?: number;
   currentStep: number;
 }
 
 export interface Response {
   id?: number;
   sessionId: number;
-  stepId: string; // 'meditation-1', 'meditation-2', 'exam-1', 'prayer', etc.
+  stepId: string;
   questionTextSnapshot: string;
   answerText: string;
   updatedAt: number;
@@ -43,11 +43,10 @@ export interface ChecklistItem {
 export interface MoodEntry {
   id?: number;
   sessionId: number;
-  value: number; // 1-10
+  value: number;
   note: string;
 }
 
-// --- Database Class ---
 export class EremosDB extends Dexie {
   biblePlan!: Table<BiblePlanEntry>;
   examinationQuestions!: Table<ExaminationQuestion>;
@@ -58,10 +57,10 @@ export class EremosDB extends Dexie {
 
   constructor() {
     super('EremosDB');
-    this.version(3).stores({
+    this.version(4).stores({
       biblePlan: '++id, day',
       examinationQuestions: '++id, category',
-      sessions: '++id, date, status',
+      sessions: '++id, date, status, userId, [userId+date], [userId+status]',
       responses: '++id, [sessionId+stepId]',
       checklistItems: '++id, sessionId',
       moodEntries: '++id, sessionId'

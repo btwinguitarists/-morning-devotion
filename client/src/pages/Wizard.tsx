@@ -8,6 +8,7 @@ import {
   usePrompts,
   useMood 
 } from "@/hooks/use-eremos";
+import { useAuth } from "@/hooks/use-auth";
 import { WizardLayout } from "@/components/WizardLayout";
 import { AutoTextArea } from "@/components/AutoTextArea";
 import { MoodSlider } from "@/components/MoodSlider";
@@ -34,7 +35,8 @@ const STEPS = [
 
 export default function Wizard() {
   const [location, setLocation] = useLocation();
-  const { session, updateStep, completeSession } = useCurrentSession();
+  const { user } = useAuth();
+  const { session, updateStep, completeSession } = useCurrentSession(user?.id);
   const [stepIndex, setStepIndex] = useState<number | null>(null);
 
   // Sync step index with session

@@ -81,27 +81,26 @@ export function useEremosData() {
 }
 
 // --- Session Management ---
-export function useCurrentSession() {
+export function useCurrentSession(userId?: string) {
   const today = format(new Date(), 'yyyy-MM-dd');
   
   const session = useLiveQuery(async () => {
-    // Try to find today's session first (even if completed)
-    const todaySession = await db.sessions.where('date').equals(today).first();
+    if (!userId) return undefined;
+    const todaySession = await db.sessions.where({ userId, date: today }).first();
     if (todaySession) return todaySession;
-    
-    // If no today session, find the most recent in-progress one (maybe from yesterday)
-    return await db.sessions.where('status').equals('in-progress').last();
-  });
+    return await db.sessions.where({ userId, status: 'in-progress' }).last();
+  }, [userId, today]);
 
   const startNewSession = async (dayOverride?: number) => {
-    // Calculate the next plan day based on history unless overridden
+    if (!userId) return;
     let nextDay = dayOverride;
     if (nextDay === undefined) {
-      const lastCompleted = await db.sessions.where('status').equals('completed').last();
+      const lastCompleted = await db.sessions.where({ userId, status: 'completed' }).last();
       nextDay = (lastCompleted?.planDay || 0) + 1;
     }
 
     const id = await db.sessions.add({
+      userId,
       date: today,
       planDay: nextDay,
       status: 'in-progress',
@@ -122,7 +121,27 @@ export function useCurrentSession() {
     });
   };
 
-  return { session, startNewSession, updateStep, completeSession };
+  const deleteSession = async (sessionId: number) => {
+    await db.responses.where('sessionId').equals(sessionId).delete();
+    await db.checklistItems.where('sessionId').equals(sessionId).delete();
+    await db.moodEntries.where('sessionId').equals(sessionId).delete();
+    await db.sessions.delete(sessionId);
+  };
+
+  const restartSession = async (sessionId: number) => {
+    const existing = await db.sessions.get(sessionId);
+    if (!existing) return;
+    await db.responses.where('sessionId').equals(sessionId).delete();
+    await db.checklistItems.where('sessionId').equals(sessionId).delete();
+    await db.moodEntries.where('sessionId').equals(sessionId).delete();
+    await db.sessions.update(sessionId, { 
+      status: 'in-progress' as const, 
+      currentStep: 0, 
+      completedAt: undefined 
+    });
+  };
+
+  return { session, startNewSession, updateStep, completeSession, deleteSession, restartSession };
 }
 
 // --- Reading Plan ---
@@ -289,7 +308,8 @@ export async function exportSessionToMarkdown(sessionId: number) {
   const stepOrder = [
     'meditation-1', 'meditation-2', 'meditation-3',
     'examination-1', 'examination-2', 'examination-3',
-    'prayer-free'
+    'prayer-free',
+    'journal-midday', 'journal-evening'
   ];
 
   const labels: Record<string, string> = {
@@ -299,7 +319,9 @@ export async function exportSessionToMarkdown(sessionId: number) {
     'examination-1': 'Examination I',
     'examination-2': 'Examination II',
     'examination-3': 'Examination III',
-    'prayer-free': 'Free Prayer'
+    'prayer-free': 'Free Prayer',
+    'journal-midday': 'Mid-Day Reflections',
+    'journal-evening': 'Evening Reflections'
   };
 
   stepOrder.forEach(stepId => {
